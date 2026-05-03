@@ -4,136 +4,155 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>4Z Design — Quote Builder</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #eef0f4; color: #1a2744; min-height: 100vh; }
+    .hidden { display: none !important; }
 
+    /* ── AUTH ── */
+    #auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; background: linear-gradient(135deg, #1a2744 0%, #0f1d3a 100%); }
+    .auth-box { background: #fff; border-radius: 18px; padding: 36px; width: 100%; max-width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+    .auth-logo { text-align: center; margin-bottom: 28px; }
+    .auth-logo .wordmark { font-size: 2rem; font-weight: 800; color: #1a2744; }
+    .auth-logo .wordmark span { color: #e8701a; }
+    .auth-logo small { display: block; color: #94a3b8; font-size: .85rem; margin-top: 4px; }
+    .auth-tabs { display: flex; background: #f1f5f9; border-radius: 10px; padding: 4px; margin-bottom: 24px; }
+    .auth-tab { flex: 1; padding: 8px; text-align: center; border-radius: 8px; border: none; background: none; font-weight: 700; font-size: .88rem; color: #64748b; cursor: pointer; transition: all .2s; }
+    .auth-tab.active { background: #fff; color: #1a2744; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+    .auth-field { margin-bottom: 16px; }
+    .auth-field label { display: block; font-size: .82rem; font-weight: 700; color: #374151; margin-bottom: 6px; }
+    .auth-field input { width: 100%; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 11px 14px; font-size: .97rem; color: #1a2744; outline: none; font-family: inherit; transition: border-color .2s; }
+    .auth-field input:focus { border-color: #e8701a; box-shadow: 0 0 0 3px rgba(232,112,26,.12); }
+    .auth-submit { width: 100%; background: linear-gradient(135deg, #e8701a, #d0611a); color: #fff; border: none; border-radius: 9px; padding: 13px; font-size: 1rem; font-weight: 800; cursor: pointer; margin-top: 8px; transition: all .2s; }
+    .auth-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(232,112,26,.35); }
+    .auth-submit:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+    .auth-error { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; border-radius: 8px; padding: 10px 14px; font-size: .84rem; margin-top: 12px; display: none; }
+    .auth-error.show { display: block; }
+
+    /* ── HEADER ── */
     header { background: #1a2744; padding: 0 32px; height: 64px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 12px rgba(0,0,0,.25); position: sticky; top: 0; z-index: 50; }
     .logo { color: #fff; font-size: 1.3rem; font-weight: 800; letter-spacing: -.5px; }
     .logo span { color: #e8701a; }
     .logo small { color: rgba(255,255,255,.35); font-weight: 400; font-size: .9rem; margin-left: 8px; }
-    .hdr-btn { background: transparent; border: 1.5px solid rgba(255,255,255,.35); color: #fff; padding: 7px 16px; border-radius: 7px; cursor: pointer; font-size: .85rem; font-weight: 600; transition: all .2s; margin-left: 8px; }
+    .hdr-right { display: flex; align-items: center; gap: 10px; }
+    .hdr-user { color: rgba(255,255,255,.55); font-size: .82rem; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hdr-btn { background: transparent; border: 1.5px solid rgba(255,255,255,.35); color: #fff; padding: 7px 16px; border-radius: 7px; cursor: pointer; font-size: .85rem; font-weight: 600; transition: all .2s; }
     .hdr-btn:hover { background: rgba(255,255,255,.12); }
+    .hdr-btn.primary { background: #e8701a; border-color: #e8701a; }
+    .hdr-btn.primary:hover { background: #d0611a; }
 
+    /* ── MAIN ── */
     .main { max-width: 900px; margin: 0 auto; padding: 32px 16px 80px; }
-
     .card { background: #fff; border-radius: 14px; padding: 28px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
     .card-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #94a3b8; margin-bottom: 18px; }
-
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
     .form-group { display: flex; flex-direction: column; }
     label { font-size: .82rem; font-weight: 700; color: #374151; margin-bottom: 6px; }
     .hint { font-size: .75rem; color: #94a3b8; margin-top: 4px; }
-
-    input[type="number"], input[type="text"], select {
-      border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 11px 14px;
-      font-size: .97rem; color: #1a2744; outline: none; width: 100%;
-      transition: border-color .2s, box-shadow .2s; background: #fff; font-family: inherit;
-    }
+    input[type="number"], input[type="text"], select { border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 11px 14px; font-size: .97rem; color: #1a2744; outline: none; width: 100%; transition: border-color .2s, box-shadow .2s; background: #fff; font-family: inherit; }
     input:focus, select:focus { border-color: #e8701a; box-shadow: 0 0 0 3px rgba(232,112,26,.12); }
     input[type="number"] { -moz-appearance: textfield; }
     input[type="number"]::-webkit-inner-spin-button { opacity: .5; }
 
-    /* Location grid */
+    /* ── LOCATION GRID ── */
     .loc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-
-    .loc-panel {
-      border: 2px solid #e2e8f0; border-radius: 12px; padding: 18px;
-      transition: all .2s; background: #f8fafc;
-    }
+    .loc-panel { border: 2px solid #e2e8f0; border-radius: 12px; padding: 18px; transition: all .2s; background: #f8fafc; }
     .loc-panel.active-panel { background: #fff; border-color: #1a2744; }
-
-    .loc-name {
-      font-size: .8rem; font-weight: 800; text-transform: uppercase;
-      letter-spacing: 1px; color: #94a3b8; margin-bottom: 12px; display: block;
-    }
+    .loc-name { font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 12px; display: block; }
     .loc-panel.active-panel .loc-name { color: #1a2744; }
-
-    /* Type pills */
     .loc-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
-    .loc-pill {
-      border: 1.5px solid #e2e8f0; background: #fff; border-radius: 20px;
-      padding: 5px 12px; font-size: .78rem; font-weight: 700; color: #64748b;
-      cursor: pointer; transition: all .2s; white-space: nowrap;
-    }
+    .loc-pill { border: 1.5px solid #e2e8f0; background: #fff; border-radius: 20px; padding: 5px 12px; font-size: .78rem; font-weight: 700; color: #64748b; cursor: pointer; transition: all .2s; white-space: nowrap; }
     .loc-pill:hover { border-color: #1a2744; color: #1a2744; }
-    .loc-pill.active-none  { border-color: #94a3b8; background: #f1f5f9; color: #64748b; }
-    .loc-pill.active-type  { border-color: #e8701a; background: #fff8f3; color: #e8701a; }
-
-    /* Per-location options */
-    .loc-opts { margin-top: 4px; }
+    .loc-pill.active-none { border-color: #94a3b8; background: #f1f5f9; }
+    .loc-pill.active-type { border-color: #e8701a; background: #fff8f3; color: #e8701a; }
     .loc-opts label { font-size: .78rem; }
 
-    .hidden { display: none !important; }
-
-    /* Alert */
+    /* ── ALERTS / BUTTONS ── */
     .alert { border-radius: 9px; padding: 11px 16px; font-size: .84rem; margin-bottom: 16px; display: none; }
-    .alert.warn { background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; }
-    .alert.err  { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+    .alert.err { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
     .alert.show { display: block; }
-
     .calc-btn { background: linear-gradient(135deg, #e8701a, #d0611a); color: #fff; border: none; border-radius: 11px; padding: 15px; font-size: 1rem; font-weight: 800; cursor: pointer; width: 100%; letter-spacing: .5px; transition: all .2s; }
     .calc-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(232,112,26,.35); }
 
-    /* Results */
+    /* ── RESULTS ── */
     #results-section { display: none; }
-
     .results-card { background: linear-gradient(135deg, #1a2744, #0f1d3a); color: #fff; border-radius: 14px; padding: 28px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(26,39,68,.3); }
     .results-card .card-title { color: rgba(255,255,255,.45); }
-
     .results-primary { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 18px; }
     .res-big { background: rgba(255,255,255,.08); border-radius: 11px; padding: 18px 14px; text-align: center; }
     .res-big .val { font-size: 2rem; font-weight: 800; color: #f5a623; line-height: 1; }
     .res-big .lbl { font-size: .75rem; color: rgba(255,255,255,.55); margin-top: 6px; text-transform: uppercase; letter-spacing: .8px; }
-
     .results-secondary { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
     .res-row { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,.06); border-radius: 9px; padding: 11px 14px; }
     .res-row .rk { font-size: .82rem; color: rgba(255,255,255,.55); }
     .res-row .rv { font-size: .9rem; font-weight: 700; }
     .res-row.highlight .rv { color: #6ee7b7; }
     .res-row.span2 { grid-column: 1 / -1; }
-
-    /* Active location breakdown */
     .loc-breakdown { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
     .loc-line { display: flex; justify-content: space-between; padding: 8px 14px; background: rgba(255,255,255,.04); border-radius: 8px; font-size: .82rem; }
     .loc-line .lk { color: rgba(255,255,255,.5); }
     .loc-line .lv { font-weight: 600; }
 
-    /* Quote section */
+    /* ── QUOTE SECTION ── */
     .quote-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
     .quote-header .card-title { margin: 0; }
     .quote-actions { display: flex; gap: 10px; margin-top: 14px; }
-
     .btn-outline { flex: 1; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 11px; font-size: .88rem; font-weight: 700; cursor: pointer; color: #374151; transition: all .2s; }
     .btn-outline:hover { border-color: #1a2744; color: #1a2744; }
     .btn-solid { flex: 1; background: #1a2744; color: #fff; border: none; border-radius: 9px; padding: 11px; font-size: .88rem; font-weight: 700; cursor: pointer; transition: all .2s; }
     .btn-solid:hover { background: #243564; }
-
     #quote-preview { width: 100%; border: 1.5px solid #e2e8f0; border-radius: 10px; min-height: 380px; display: block; background: #fff; }
-
     .copy-flash { font-size: .8rem; color: #059669; font-weight: 700; opacity: 0; transition: opacity .3s; }
     .copy-flash.show { opacity: 1; }
 
-    /* Modals */
+    /* ── MODALS ── */
     .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 200; align-items: center; justify-content: center; padding: 16px; }
     .overlay.open { display: flex; }
-    .modal { background: #fff; border-radius: 16px; padding: 28px; width: 100%; max-width: 500px; max-height: 88vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+    .modal { background: #fff; border-radius: 16px; padding: 28px; width: 100%; max-width: 680px; max-height: 88vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
     .modal-title { font-size: 1.15rem; font-weight: 800; margin-bottom: 6px; }
     .modal-sub { font-size: .84rem; color: #64748b; margin-bottom: 22px; }
     .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
-
     #edit-html-area { width: 100%; min-height: 300px; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 14px; font-size: .8rem; font-family: 'Courier New', monospace; outline: none; resize: vertical; }
     #edit-html-area:focus { border-color: #e8701a; }
 
-    .quote-list { display: flex; flex-direction: column; gap: 10px; }
-    .quote-item { border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all .2s; }
-    .quote-item:hover { border-color: #1a2744; background: #f8fafc; }
-    .qi-name { font-weight: 700; font-size: .92rem; }
-    .qi-meta { font-size: .78rem; color: #94a3b8; margin-top: 2px; }
-    .qi-del { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1.1rem; padding: 4px 8px; border-radius: 6px; }
-    .qi-del:hover { background: #fee2e2; }
-    .empty-state { text-align: center; color: #94a3b8; padding: 32px; font-size: .9rem; }
+    /* ── SETTINGS OVERLAY ── */
+    #settings-overlay { position: fixed; inset: 0; background: #f8fafc; z-index: 300; display: flex; flex-direction: column; overflow: hidden; }
+    .settings-hdr { background: #1a2744; padding: 0 28px; height: 64px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .settings-hdr h2 { color: #fff; font-size: 1.1rem; font-weight: 800; }
+    .settings-hdr-btns { display: flex; align-items: center; gap: 10px; }
+    #save-status { font-size: .82rem; font-weight: 700; }
+    #save-status.ok { color: #6ee7b7; }
+    #save-status.err { color: #f87171; }
+    .settings-tabs { background: #fff; border-bottom: 2px solid #e2e8f0; padding: 0 28px; display: flex; gap: 2px; flex-shrink: 0; overflow-x: auto; }
+    .s-tab { padding: 14px 18px; font-size: .85rem; font-weight: 700; color: #64748b; border: none; background: none; cursor: pointer; border-bottom: 3px solid transparent; transition: all .2s; white-space: nowrap; margin-bottom: -2px; }
+    .s-tab.active { color: #e8701a; border-bottom-color: #e8701a; }
+    .settings-body { flex: 1; overflow-y: auto; padding: 28px; }
+    .section-note { font-size: .82rem; color: #64748b; margin-bottom: 16px; background: #f1f5f9; border-radius: 9px; padding: 12px 16px; line-height: 1.5; }
 
+    /* ── SETTINGS TABLES ── */
+    .stbl-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+    .stbl { border-collapse: collapse; width: 100%; font-size: .82rem; }
+    .stbl th { background: #f1f5f9; padding: 8px 8px; text-align: center; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #64748b; border: 1px solid #e2e8f0; white-space: nowrap; }
+    .stbl td { padding: 5px 5px; border: 1px solid #e2e8f0; text-align: center; background: #fff; }
+    .stbl tbody tr:hover td { background: #fffbf7; }
+    .stbl input[type="number"] { border: 1px solid #d1d5db; border-radius: 6px; padding: 4px 6px; font-size: .82rem; text-align: center; width: 62px; font-family: inherit; color: #1a2744; background: #fff; box-shadow: none; }
+    .stbl input[type="number"]:focus { border-color: #e8701a; outline: none; box-shadow: 0 0 0 2px rgba(232,112,26,.12); }
+    .stbl input.w52 { width: 52px; }
+    .stbl input.w72 { width: 72px; }
+    .stbl .del-btn { background: none; border: none; cursor: pointer; color: #ef4444; font-size: 1rem; padding: 4px 8px; border-radius: 6px; }
+    .stbl .del-btn:hover { background: #fee2e2; }
+    .sp-sub { font-size: .65rem; color: #94a3b8; display: block; }
+    .add-row-btn { margin-top: 12px; border: 1.5px dashed #cbd5e1; background: none; border-radius: 9px; padding: 9px 20px; font-size: .84rem; font-weight: 700; color: #64748b; cursor: pointer; transition: all .2s; }
+    .add-row-btn:hover { border-color: #e8701a; color: #e8701a; background: #fff8f3; }
+
+    /* ── QUOTE TEMPLATE ── */
+    .qt-field { margin-bottom: 18px; }
+    .qt-field label { display: block; font-size: .82rem; font-weight: 700; color: #374151; margin-bottom: 6px; }
+    .qt-field textarea { width: 100%; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 11px 14px; font-size: .9rem; color: #1a2744; outline: none; resize: vertical; font-family: inherit; min-height: 70px; transition: border-color .2s; }
+    .qt-field textarea:focus { border-color: #e8701a; box-shadow: 0 0 0 3px rgba(232,112,26,.12); }
+
+    /* ── RESPONSIVE ── */
     @media (max-width: 620px) {
       .loc-grid { grid-template-columns: 1fr; }
       .form-row { grid-template-columns: 1fr; }
@@ -141,22 +160,56 @@
       .results-secondary { grid-template-columns: 1fr; }
       .quote-actions { flex-direction: column; }
       header { padding: 0 16px; }
+      .hdr-user { display: none; }
     }
   </style>
 </head>
 <body>
 
+<!-- ═══════════════════════
+     AUTH SCREEN
+═══════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="wordmark">4Z<span>Design</span></div>
+      <small>Quote Builder — Sign in to continue</small>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login"  onclick="switchAuthTab('login')">Sign In</button>
+      <button class="auth-tab"        id="tab-signup" onclick="switchAuthTab('signup')">Create Account</button>
+    </div>
+    <div class="auth-field">
+      <label>Email address</label>
+      <input type="text" id="auth-email" placeholder="you@company.com" onkeydown="if(event.key==='Enter')authSubmit()">
+    </div>
+    <div class="auth-field">
+      <label>Password</label>
+      <input type="password" id="auth-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')authSubmit()">
+    </div>
+    <button class="auth-submit" id="auth-btn" onclick="authSubmit()">Sign In</button>
+    <div class="auth-error" id="auth-error"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════
+     APP
+═══════════════════════ -->
+<div id="app" class="hidden">
+
 <header>
   <div class="logo">4Z<span>Design</span><small>Quote Builder</small></div>
-  <div>
-    <button class="hdr-btn" onclick="openLoadModal()">📂 Saved Quotes</button>
+  <div class="hdr-right">
+    <span class="hdr-user" id="hdr-user-email"></span>
+    <button class="hdr-btn" onclick="openSettings()">⚙️ Settings</button>
     <button class="hdr-btn" onclick="resetAll()">+ New Quote</button>
+    <button class="hdr-btn" onclick="signOut()">Sign Out</button>
   </div>
 </header>
 
 <div class="main">
 
-  <!-- STEP 1: Order Details -->
+  <!-- STEP 1 -->
   <div class="card">
     <div class="card-title">Step 1 — Order Details</div>
     <div class="form-row">
@@ -182,100 +235,86 @@
     </div>
   </div>
 
-  <!-- STEP 2: Decoration Locations -->
+  <!-- STEP 2 -->
   <div class="card">
-    <div class="card-title">Step 2 — Decorations  <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#b0bec5">Select a type for each location you want decorated</span></div>
-    <div class="loc-grid" id="loc-grid">
-      <!-- Injected by JS -->
-    </div>
+    <div class="card-title">Step 2 — Decorations <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#b0bec5">Select a type for each location</span></div>
+    <div class="loc-grid" id="loc-grid"></div>
   </div>
 
-  <div class="alert warn" id="alert-warn"></div>
-  <div class="alert err"  id="alert-err"></div>
-
+  <div class="alert err" id="alert-err"></div>
   <button class="calc-btn" onclick="calculate()">Calculate Quote →</button>
 
   <!-- RESULTS -->
   <div id="results-section" style="margin-top:20px;">
-
     <div class="results-card">
       <div class="card-title">Your Numbers</div>
-
       <div class="results-primary">
-        <div class="res-big">
-          <div class="val" id="r-total-unit">—</div>
-          <div class="lbl">Price Per Unit</div>
-        </div>
-        <div class="res-big">
-          <div class="val" id="r-total-order">—</div>
-          <div class="lbl">Total Order</div>
-        </div>
-        <div class="res-big">
-          <div class="val" id="r-profit">—</div>
-          <div class="lbl">Net Profit</div>
-        </div>
+        <div class="res-big"><div class="val" id="r-total-unit">—</div><div class="lbl">Price Per Unit</div></div>
+        <div class="res-big"><div class="val" id="r-total-order">—</div><div class="lbl">Total Order</div></div>
+        <div class="res-big"><div class="val" id="r-profit">—</div><div class="lbl">Gross Profit</div></div>
       </div>
-
-      <!-- Active location breakdown -->
       <div class="loc-breakdown" id="loc-breakdown"></div>
-
       <div class="results-secondary">
-        <div class="res-row">
-          <span class="rk">Apparel Cost</span>
-          <span class="rv" id="r-apparel">—</span>
-        </div>
-        <div class="res-row">
-          <span class="rk">Total Decoration</span>
-          <span class="rv" id="r-print-total">—</span>
-        </div>
-        <div class="res-row">
-          <span class="rk">Sub Total / unit</span>
-          <span class="rv" id="r-subtotal">—</span>
-        </div>
-        <div class="res-row">
-          <span class="rk">Margin Rate</span>
-          <span class="rv" id="r-margin-rate">—</span>
-        </div>
-        <div class="res-row">
-          <span class="rk">Gross Margin $</span>
-          <span class="rv" id="r-margin">—</span>
-        </div>
-        <div class="res-row">
-          <span class="rk">IPU Cost (10%)</span>
-          <span class="rv" id="r-ipu-total">—</span>
-        </div>
-        <div class="res-row highlight span2">
-          <span class="rk">Profit After IPU</span>
-          <span class="rv" id="r-profit2">—</span>
-        </div>
+        <div class="res-row"><span class="rk">Apparel Cost</span><span class="rv" id="r-apparel">—</span></div>
+        <div class="res-row"><span class="rk">Total Decoration</span><span class="rv" id="r-print-total">—</span></div>
+        <div class="res-row"><span class="rk">Sub Total / unit</span><span class="rv" id="r-subtotal">—</span></div>
+        <div class="res-row"><span class="rk">Margin Rate</span><span class="rv" id="r-margin-rate">—</span></div>
+        <div class="res-row highlight span2"><span class="rk">Gross Margin $</span><span class="rv" id="r-margin">—</span></div>
       </div>
     </div>
 
-    <!-- HTML Quote -->
+    <!-- CLIENT QUOTE -->
     <div class="card">
       <div class="quote-header">
         <div class="card-title">Client Quote</div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="copy-flash" id="copy-flash">Copied!</span>
-          <button class="btn-outline" style="flex:none;padding:7px 14px;font-size:.8rem;" onclick="openEditModal()">✏️ Edit HTML</button>
+          <button class="btn-outline" style="flex:none;padding:7px 14px;font-size:.8rem;" onclick="openEditModal()">✏️ Edit Quote</button>
         </div>
       </div>
       <iframe id="quote-preview" title="Quote Preview" sandbox="allow-same-origin"></iframe>
       <div class="quote-actions">
         <button class="btn-outline" onclick="copyHtml()">📋 Copy HTML</button>
         <button class="btn-outline" onclick="copyPlainText()">📄 Plain Text</button>
-        <button class="btn-solid"   onclick="openSaveModal()">💾 Save Quote</button>
       </div>
     </div>
+  </div>
 
+</div><!-- .main -->
+
+<!-- ═══════════════════════
+     SETTINGS OVERLAY
+═══════════════════════ -->
+<div id="settings-overlay" class="hidden">
+  <div class="settings-hdr">
+    <h2>⚙️ Settings</h2>
+    <div class="settings-hdr-btns">
+      <span id="save-status"></span>
+      <button class="hdr-btn primary" onclick="saveSettings()">💾 Save Settings</button>
+      <button class="hdr-btn" onclick="closeSettings()">✕ Close</button>
+    </div>
+  </div>
+  <div class="settings-tabs" id="settings-tab-bar">
+    <button class="s-tab active" onclick="switchSettingsTab('ht')">🔥 Heat Transfer</button>
+    <button class="s-tab" onclick="switchSettingsTab('emb')">🧵 Embroidery</button>
+    <button class="s-tab" onclick="switchSettingsTab('sp')">🖨️ Screen Print</button>
+    <button class="s-tab" onclick="switchSettingsTab('margin')">📊 Margin</button>
+    <button class="s-tab" onclick="switchSettingsTab('quote')">✉️ Quote Template</button>
+  </div>
+  <div class="settings-body">
+    <div id="stab-ht"></div>
+    <div id="stab-emb"    class="hidden"></div>
+    <div id="stab-sp"     class="hidden"></div>
+    <div id="stab-margin" class="hidden"></div>
+    <div id="stab-quote"  class="hidden"></div>
   </div>
 </div>
 
-<!-- Edit HTML Modal -->
+<!-- Edit Quote Modal -->
 <div class="overlay" id="edit-modal">
-  <div class="modal" style="max-width:680px;">
-    <div class="modal-title">Edit Quote HTML</div>
-    <div class="modal-sub">Modify then click Apply.</div>
+  <div class="modal">
+    <div class="modal-title">Edit Quote</div>
+    <div class="modal-sub">Modify the HTML then click Apply. Changes apply to this quote only — edit your template in Settings to change the default.</div>
     <textarea id="edit-html-area"></textarea>
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeModal('edit-modal')">Cancel</button>
@@ -284,429 +323,713 @@
   </div>
 </div>
 
-<!-- Save Modal -->
-<div class="overlay" id="save-modal">
-  <div class="modal">
-    <div class="modal-title">Save This Quote</div>
-    <div class="modal-sub">Name it so you can pull it back up later.</div>
-    <div class="form-group">
-      <label for="quote-name">Quote Name</label>
-      <input type="text" id="quote-name" placeholder="e.g. Acme Corp — 50 Polos">
-    </div>
-    <div class="modal-actions">
-      <button class="btn-outline" onclick="closeModal('save-modal')">Cancel</button>
-      <button class="btn-solid"   onclick="saveQuote()">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- Load Modal -->
-<div class="overlay" id="load-modal">
-  <div class="modal">
-    <div class="modal-title">Saved Quotes</div>
-    <div class="modal-sub">Click a quote to restore it.</div>
-    <div class="quote-list" id="quote-list"></div>
-    <div class="modal-actions">
-      <button class="btn-outline" onclick="closeModal('load-modal')" style="flex:none;padding:11px 24px;">Close</button>
-    </div>
-  </div>
-</div>
+</div><!-- #app -->
 
 <script>
-// ─────────────────────────────────────────
-//  PRICING DATA
-// ─────────────────────────────────────────
-const IPU_RATE = 0.10;
+// ═══════════════════════════════════════
+//  SUPABASE
+// ═══════════════════════════════════════
+const SUPABASE_URL = 'https://gdkzeedviqqtjeqrigur.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_X6eGAzHM2Ai9laXSZdlE_g_QTKmQUHQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Margin lookup — =IFS(qty<36,100%,qty<=60,85%,qty<=144,65%,qty<=249,55%,qty>=250,40%)
+// ═══════════════════════════════════════
+//  DEFAULT PRICING
+// ═══════════════════════════════════════
+const HT_SIZE_LABELS = [
+  '1.5″×1.5″','2.5″×2.5″','4″×4″','5.8″×8.3″',
+  '11.7″×4.25″','16.5″×5.85″','8.3″×11.7″','11.7″×11.7″','11.7″×16.5″'
+];
+
+const DEFAULT_HT = [
+  {from:10,  to:19,  prices:[2.62,2.95,3.23,4.28,4.28,5.12,5.12,6.43,7.74]},
+  {from:20,  to:49,  prices:[2.18,2.45,2.69,3.57,3.57,4.27,4.27,5.37,6.46]},
+  {from:50,  to:99,  prices:[1.30,1.62,1.96,2.56,2.56,3.30,3.30,4.24,5.20]},
+  {from:100, to:199, prices:[0.87,1.11,1.45,1.77,1.77,2.27,2.27,2.95,3.63]},
+  {from:200, to:299, prices:[0.70,0.93,1.26,1.49,1.49,1.86,1.86,2.43,3.02]},
+  {from:300, to:499, prices:[0.56,0.78,1.10,1.33,1.33,1.71,1.71,2.24,2.78]},
+];
+
+const DEFAULT_EMB = [
+  {from:1,   to:5,   price:7.00},
+  {from:6,   to:23,  price:5.50},
+  {from:24,  to:35,  price:5.25},
+  {from:36,  to:71,  price:4.75},
+  {from:72,  to:143, price:4.25},
+  {from:144, to:500, price:3.25},
+];
+
+// SP: each tier has 10 color entries {price (run cost/piece), setup (total screen setup $)}
+// Decoration cost = price + setup/qty
+const DEFAULT_SP = [
+  {from:12,  to:36,  colors:[
+    {price:2.85,setup:30},{price:2.95,setup:60},{price:3.10,setup:90},{price:3.30,setup:120},{price:3.50,setup:150},
+    {price:3.65,setup:180},{price:3.85,setup:210},{price:4.00,setup:240},{price:4.20,setup:270},{price:4.40,setup:300}]},
+  {from:37,  to:60,  colors:[
+    {price:2.35,setup:30},{price:2.45,setup:60},{price:2.60,setup:90},{price:2.70,setup:120},{price:2.80,setup:150},
+    {price:2.90,setup:180},{price:3.05,setup:210},{price:3.15,setup:240},{price:3.30,setup:270},{price:3.45,setup:300}]},
+  {from:61,  to:144, colors:[
+    {price:2.00,setup:30},{price:2.05,setup:60},{price:2.20,setup:90},{price:2.40,setup:120},{price:2.55,setup:150},
+    {price:2.65,setup:180},{price:2.80,setup:210},{price:2.95,setup:240},{price:3.10,setup:270},{price:3.25,setup:300}]},
+  {from:145, to:249, colors:[
+    {price:1.80,setup:30},{price:1.90,setup:60},{price:2.05,setup:90},{price:2.15,setup:120},{price:2.35,setup:150},
+    {price:2.55,setup:180},{price:2.70,setup:210},{price:2.85,setup:240},{price:3.00,setup:270},{price:3.15,setup:300}]},
+  {from:250, to:600, colors:[
+    {price:1.20,setup:34},{price:1.25,setup:68},{price:1.45,setup:102},{price:1.50,setup:136},{price:1.65,setup:170},
+    {price:2.50,setup:204},{price:2.65,setup:238},{price:2.80,setup:272},{price:2.95,setup:306},{price:3.10,setup:340}]},
+];
+
+const DEFAULT_MARGIN = [
+  {from:1,   to:35,   margin:1.00},
+  {from:36,  to:60,   margin:0.85},
+  {from:61,  to:144,  margin:0.65},
+  {from:145, to:249,  margin:0.55},
+  {from:250, to:9999, margin:0.40},
+];
+
+const DEFAULT_QT = {
+  greeting:  "Thanks for reaching out—here's a first pass on your quote:",
+  body1:     "This includes the decoration and is based on the quantity above.",
+  body2:     "Shipping and sales tax are not included and will be added once we finalize details.",
+  body3:     "If you want to tweak garment options, sizing, or quantities, I can adjust this quickly. Just let me know what direction you want to go.",
+  signature: "— Marc\n4Z Design\nmarc@4zdesign.com"
+};
+
+// ═══════════════════════════════════════
+//  USER STATE
+// ═══════════════════════════════════════
+let currentUser = null;
+let userPricing = {
+  htTiers:      deepClone(DEFAULT_HT),
+  embTiers:     deepClone(DEFAULT_EMB),
+  spTiers:      deepClone(DEFAULT_SP),
+  marginTiers:  deepClone(DEFAULT_MARGIN),
+  quoteTemplate: {...DEFAULT_QT}
+};
+
+function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+
+// ═══════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════
+let authMode = 'login';
+
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+  document.getElementById('tab-signup').classList.toggle('active', mode === 'signup');
+  document.getElementById('auth-btn').textContent = mode === 'login' ? 'Sign In' : 'Create Account';
+  document.getElementById('auth-error').classList.remove('show');
+}
+
+async function authSubmit() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
+  document.getElementById('auth-error').classList.remove('show');
+  if (!email || !pass) { showAuthErr('Please enter your email and password.'); return; }
+  const btn = document.getElementById('auth-btn');
+  btn.disabled = true;
+  btn.textContent = authMode === 'login' ? 'Signing in…' : 'Creating account…';
+  try {
+    const res = authMode === 'login'
+      ? await sb.auth.signInWithPassword({ email, password: pass })
+      : await sb.auth.signUp({ email, password: pass });
+    if (res.error) throw res.error;
+  } catch(e) {
+    showAuthErr(e.message || 'Something went wrong.');
+    btn.disabled = false;
+    btn.textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
+  }
+}
+
+function showAuthErr(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.classList.add('show');
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+}
+
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (session?.user) {
+    currentUser = session.user;
+    document.getElementById('hdr-user-email').textContent = currentUser.email;
+    document.getElementById('auth-screen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    await loadUserSettings();
+    buildLocGrid();
+  } else {
+    currentUser = null;
+    document.getElementById('auth-screen').classList.remove('hidden');
+    document.getElementById('app').classList.add('hidden');
+    userPricing = {
+      htTiers: deepClone(DEFAULT_HT), embTiers: deepClone(DEFAULT_EMB),
+      spTiers: deepClone(DEFAULT_SP), marginTiers: deepClone(DEFAULT_MARGIN),
+      quoteTemplate: {...DEFAULT_QT}
+    };
+    resetAll();
+  }
+});
+
+// ═══════════════════════════════════════
+//  SUPABASE DATA
+// ═══════════════════════════════════════
+async function loadUserSettings() {
+  const { data, error } = await sb
+    .from('user_settings').select('*')
+    .eq('user_id', currentUser.id).maybeSingle();
+  if (error) { console.warn('loadUserSettings:', error.message); return; }
+  if (!data) return;
+  if (data.ht_pricing)      userPricing.htTiers      = data.ht_pricing;
+  if (data.emb_pricing)     userPricing.embTiers      = data.emb_pricing;
+  if (data.sp_pricing)      userPricing.spTiers       = data.sp_pricing;
+  if (data.margin_settings) userPricing.marginTiers   = data.margin_settings;
+  if (data.quote_template) {
+    try {
+      userPricing.quoteTemplate = typeof data.quote_template === 'string'
+        ? JSON.parse(data.quote_template) : data.quote_template;
+    } catch(e) {}
+  }
+}
+
+async function saveSettings() {
+  if (!currentUser) return;
+  collectSettings();
+  const ss = document.getElementById('save-status');
+  ss.textContent = 'Saving…'; ss.className = '';
+  const { error } = await sb.from('user_settings').upsert({
+    user_id:         currentUser.id,
+    ht_pricing:      userPricing.htTiers,
+    emb_pricing:     userPricing.embTiers,
+    sp_pricing:      userPricing.spTiers,
+    margin_settings: userPricing.marginTiers,
+    quote_template:  JSON.stringify(userPricing.quoteTemplate),
+    updated_at:      new Date().toISOString()
+  }, { onConflict: 'user_id' });
+  if (error) {
+    ss.textContent = '✗ ' + error.message; ss.className = 'err';
+  } else {
+    ss.textContent = '✓ Saved'; ss.className = 'ok';
+    setTimeout(() => { ss.textContent = ''; }, 3000);
+    buildLocGrid(); // refresh dropdowns
+  }
+}
+
+// ═══════════════════════════════════════
+//  SETTINGS UI
+// ═══════════════════════════════════════
+const STABS = ['ht','emb','sp','margin','quote'];
+let activeStab = 'ht';
+
+function openSettings() {
+  renderAllTabs();
+  document.getElementById('settings-overlay').classList.remove('hidden');
+  document.getElementById('save-status').textContent = '';
+}
+function closeSettings() { document.getElementById('settings-overlay').classList.add('hidden'); }
+
+function switchSettingsTab(tab) {
+  activeStab = tab;
+  STABS.forEach(t => document.getElementById('stab-' + t).classList.toggle('hidden', t !== tab));
+  document.querySelectorAll('.s-tab').forEach((btn, i) => btn.classList.toggle('active', STABS[i] === tab));
+}
+
+function renderAllTabs() {
+  renderHtTab(); renderEmbTab(); renderSpTab(); renderMarginTab(); renderQuoteTab();
+}
+
+// ─── HEAT TRANSFER ────────────────────────────
+function renderHtTab() {
+  const tiers = userPricing.htTiers;
+  const hdrCells = HT_SIZE_LABELS.map(s => `<th title="${s}">${s}</th>`).join('');
+  const rows = tiers.map((t, ri) => {
+    const pCells = HT_SIZE_LABELS.map((_, si) =>
+      `<td><input type="number" step="0.01" min="0" value="${(t.prices[si]||0).toFixed(2)}" data-ht="${ri}-${si}" class="w52"></td>`
+    ).join('');
+    return `<tr>
+      <td><input type="number" step="1" min="0" value="${t.from}" data-ht-from="${ri}" class="w52"></td>
+      <td><input type="number" step="1" min="0" value="${t.to}"   data-ht-to="${ri}"   class="w52"></td>
+      ${pCells}
+      <td><button class="del-btn" onclick="delHtRow(${ri})">✕</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('stab-ht').innerHTML = `
+    <p class="section-note">Decoration cost per piece for each quantity range and transfer size. These are your cost to the client — margin is applied separately.</p>
+    <div class="stbl-wrap">
+      <table class="stbl">
+        <thead><tr><th>From</th><th>To</th>${hdrCells}<th></th></tr></thead>
+        <tbody id="ht-tbody">${rows}</tbody>
+      </table>
+    </div>
+    <button class="add-row-btn" onclick="addHtRow()">+ Add Quantity Break</button>`;
+}
+
+function addHtRow() {
+  collectHtTiers();
+  const last = userPricing.htTiers.at(-1);
+  userPricing.htTiers.push({ from: last ? last.to+1 : 10, to: last ? last.to+100 : 99, prices: Array(9).fill(0) });
+  renderHtTab();
+}
+function delHtRow(ri) { collectHtTiers(); userPricing.htTiers.splice(ri,1); renderHtTab(); }
+
+function collectHtTiers() {
+  const tiers = [];
+  const ensure = ri => { if (!tiers[ri]) tiers[ri] = {from:0,to:0,prices:Array(9).fill(0)}; };
+  document.querySelectorAll('[data-ht-from]').forEach(el => { const ri=+el.dataset.htFrom; ensure(ri); tiers[ri].from=+el.value||0; });
+  document.querySelectorAll('[data-ht-to]').forEach(el   => { const ri=+el.dataset.htTo;   ensure(ri); tiers[ri].to=+el.value||0; });
+  document.querySelectorAll('[data-ht]').forEach(el => {
+    const [ri,si] = el.dataset.ht.split('-').map(Number);
+    ensure(ri); tiers[ri].prices[si] = parseFloat(el.value)||0;
+  });
+  userPricing.htTiers = tiers.filter(Boolean);
+}
+
+// ─── EMBROIDERY ────────────────────────────────
+function renderEmbTab() {
+  const tiers = userPricing.embTiers;
+  const rows = tiers.map((t, ri) => `<tr>
+    <td><input type="number" step="1"    min="0" value="${t.from}"            data-emb-from="${ri}"  class="w52"></td>
+    <td><input type="number" step="1"    min="0" value="${t.to}"              data-emb-to="${ri}"    class="w52"></td>
+    <td><input type="number" step="0.01" min="0" value="${t.price.toFixed(2)}" data-emb-price="${ri}" class="w72"></td>
+    <td><button class="del-btn" onclick="delEmbRow(${ri})">✕</button></td>
+  </tr>`).join('');
+  document.getElementById('stab-emb').innerHTML = `
+    <p class="section-note">Flat decoration cost per piece, based on quantity. Default is standard 6,000-stitch embroidery.</p>
+    <div class="stbl-wrap">
+      <table class="stbl" style="max-width:400px;">
+        <thead><tr><th>From</th><th>To</th><th>Price / Piece</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <button class="add-row-btn" style="max-width:400px;" onclick="addEmbRow()">+ Add Quantity Break</button>`;
+}
+
+function addEmbRow() {
+  collectEmbTiers();
+  const last = userPricing.embTiers.at(-1);
+  userPricing.embTiers.push({ from: last ? last.to+1 : 1, to: last ? last.to+100 : 99, price: 0 });
+  renderEmbTab();
+}
+function delEmbRow(ri) { collectEmbTiers(); userPricing.embTiers.splice(ri,1); renderEmbTab(); }
+
+function collectEmbTiers() {
+  const tiers = [];
+  const ensure = ri => { if (!tiers[ri]) tiers[ri] = {from:0,to:0,price:0}; };
+  document.querySelectorAll('[data-emb-from]').forEach(el  => { const ri=+el.dataset.embFrom;  ensure(ri); tiers[ri].from=+el.value||0; });
+  document.querySelectorAll('[data-emb-to]').forEach(el    => { const ri=+el.dataset.embTo;    ensure(ri); tiers[ri].to=+el.value||0; });
+  document.querySelectorAll('[data-emb-price]').forEach(el => { const ri=+el.dataset.embPrice; ensure(ri); tiers[ri].price=parseFloat(el.value)||0; });
+  userPricing.embTiers = tiers.filter(Boolean);
+}
+
+// ─── SCREEN PRINT ───────────────────────────────
+function renderSpTab() {
+  const tiers = userPricing.spTiers;
+  const colHdrs = Array.from({length:10},(_,i) => `<th colspan="2">${i+1} Color${i>0?'s':''}</th>`).join('');
+  const subHdrs = Array.from({length:10}, () =>
+    `<th style="font-size:.65rem;">Price</th><th style="font-size:.65rem;background:#f8fafc;">Setup$</th>`
+  ).join('');
+  const rows = tiers.map((t, ri) => {
+    const cCells = Array.from({length:10}, (_,ci) => {
+      const c = t.colors[ci] || {price:0,setup:0};
+      return `<td><input type="number" step="0.01" min="0" value="${(c.price||0).toFixed(2)}" data-sp="${ri}-${ci}-price" class="w52"></td>
+              <td style="background:#fafffe;"><input type="number" step="1" min="0" value="${c.setup||0}" data-sp="${ri}-${ci}-setup" class="w52"></td>`;
+    }).join('');
+    return `<tr>
+      <td><input type="number" step="1" min="0" value="${t.from}" data-sp-from="${ri}" class="w52"></td>
+      <td><input type="number" step="1" min="0" value="${t.to}"   data-sp-to="${ri}"   class="w52"></td>
+      ${cCells}
+      <td><button class="del-btn" onclick="delSpRow(${ri})">✕</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('stab-sp').innerHTML = `
+    <p class="section-note"><strong>Price</strong> = run cost per piece. <strong>Setup$</strong> = total screen setup cost for that color count (e.g. $30 for 1 color, $60 for 2). Setup is divided by qty at calculation. Final cost = Price + Setup÷Qty.</p>
+    <div class="stbl-wrap">
+      <table class="stbl">
+        <thead>
+          <tr><th rowspan="2">From</th><th rowspan="2">To</th>${colHdrs}<th rowspan="2"></th></tr>
+          <tr>${subHdrs}</tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <button class="add-row-btn" onclick="addSpRow()">+ Add Quantity Break</button>`;
+}
+
+function addSpRow() {
+  collectSpTiers();
+  const last = userPricing.spTiers.at(-1);
+  userPricing.spTiers.push({
+    from: last ? last.to+1 : 12, to: last ? last.to+100 : 99,
+    colors: Array.from({length:10}, (_,i) => ({price:0, setup:(i+1)*30}))
+  });
+  renderSpTab();
+}
+function delSpRow(ri) { collectSpTiers(); userPricing.spTiers.splice(ri,1); renderSpTab(); }
+
+function collectSpTiers() {
+  const tiers = [];
+  const ensure = ri => {
+    if (!tiers[ri]) tiers[ri] = {from:0,to:0,colors:Array.from({length:10},()=>({price:0,setup:0}))};
+  };
+  document.querySelectorAll('[data-sp-from]').forEach(el => { const ri=+el.dataset.spFrom; ensure(ri); tiers[ri].from=+el.value||0; });
+  document.querySelectorAll('[data-sp-to]').forEach(el   => { const ri=+el.dataset.spTo;   ensure(ri); tiers[ri].to=+el.value||0; });
+  document.querySelectorAll('[data-sp]').forEach(el => {
+    const [ri,ci,field] = el.dataset.sp.split('-');
+    const r=+ri, c=+ci; ensure(r);
+    if (!tiers[r].colors[c]) tiers[r].colors[c] = {price:0,setup:0};
+    tiers[r].colors[c][field] = parseFloat(el.value)||0;
+  });
+  userPricing.spTiers = tiers.filter(Boolean);
+}
+
+// ─── MARGIN ────────────────────────────────────
+function renderMarginTab() {
+  const tiers = userPricing.marginTiers;
+  const rows = tiers.map((t, ri) => `<tr>
+    <td><input type="number" step="1" min="0" value="${t.from}"                   data-mg-from="${ri}" class="w52"></td>
+    <td><input type="number" step="1" min="0" value="${t.to === 9999 ? 9999 : t.to}" data-mg-to="${ri}"   class="w52"></td>
+    <td><input type="number" step="1" min="0" max="999" value="${Math.round(t.margin*100)}" data-mg-pct="${ri}" class="w52"></td>
+    <td><button class="del-btn" onclick="delMarginRow(${ri})">✕</button></td>
+  </tr>`).join('');
+  document.getElementById('stab-margin').innerHTML = `
+    <p class="section-note">Your markup percentage per quantity break — applies to all decoration types. Selling price = (Apparel + Decoration) × (1 + Margin%). Use 9999 as the "To" value for your highest tier.</p>
+    <div class="stbl-wrap">
+      <table class="stbl" style="max-width:420px;">
+        <thead><tr><th>Qty From</th><th>Qty To</th><th>Margin %</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <button class="add-row-btn" style="max-width:420px;" onclick="addMarginRow()">+ Add Quantity Break</button>`;
+}
+
+function addMarginRow() {
+  collectMarginTiers();
+  const last = userPricing.marginTiers.at(-1);
+  userPricing.marginTiers.push({ from: last ? last.to+1 : 1, to: 9999, margin: 0.40 });
+  renderMarginTab();
+}
+function delMarginRow(ri) { collectMarginTiers(); userPricing.marginTiers.splice(ri,1); renderMarginTab(); }
+
+function collectMarginTiers() {
+  const tiers = [];
+  const ensure = ri => { if (!tiers[ri]) tiers[ri] = {from:0,to:0,margin:0}; };
+  document.querySelectorAll('[data-mg-from]').forEach(el  => { const ri=+el.dataset.mgFrom;  ensure(ri); tiers[ri].from=+el.value||0; });
+  document.querySelectorAll('[data-mg-to]').forEach(el    => { const ri=+el.dataset.mgTo;    ensure(ri); tiers[ri].to=+el.value||0; });
+  document.querySelectorAll('[data-mg-pct]').forEach(el   => { const ri=+el.dataset.mgPct;   ensure(ri); tiers[ri].margin=(parseFloat(el.value)||0)/100; });
+  userPricing.marginTiers = tiers.filter(Boolean);
+}
+
+// ─── QUOTE TEMPLATE ────────────────────────────
+function renderQuoteTab() {
+  const qt = userPricing.quoteTemplate;
+  document.getElementById('stab-quote').innerHTML = `
+    <p class="section-note">Edit the default text for client-facing quotes. The order summary table (garment, decoration, qty, price) is generated automatically and cannot be edited here — use "Edit Quote" on a finished quote for one-off changes.</p>
+    <div class="qt-field"><label>Opening line (after "Hi [Client],")</label>
+      <textarea id="qt-greeting" rows="2">${escHtml(qt.greeting||'')}</textarea></div>
+    <div class="qt-field"><label>Body — paragraph 1</label>
+      <textarea id="qt-body1" rows="2">${escHtml(qt.body1||'')}</textarea></div>
+    <div class="qt-field"><label>Body — paragraph 2</label>
+      <textarea id="qt-body2" rows="2">${escHtml(qt.body2||'')}</textarea></div>
+    <div class="qt-field"><label>Body — paragraph 3</label>
+      <textarea id="qt-body3" rows="2">${escHtml(qt.body3||'')}</textarea></div>
+    <div class="qt-field"><label>Signature</label>
+      <textarea id="qt-sig" rows="3">${escHtml(qt.signature||'')}</textarea></div>`;
+}
+
+function collectQuoteTemplate() {
+  userPricing.quoteTemplate = {
+    greeting:  document.getElementById('qt-greeting')?.value || DEFAULT_QT.greeting,
+    body1:     document.getElementById('qt-body1')?.value    || DEFAULT_QT.body1,
+    body2:     document.getElementById('qt-body2')?.value    || DEFAULT_QT.body2,
+    body3:     document.getElementById('qt-body3')?.value    || DEFAULT_QT.body3,
+    signature: document.getElementById('qt-sig')?.value      || DEFAULT_QT.signature,
+  };
+}
+
+function collectSettings() {
+  collectHtTiers(); collectEmbTiers(); collectSpTiers();
+  collectMarginTiers(); collectQuoteTemplate();
+}
+
+// ═══════════════════════════════════════
+//  PRICING LOOKUPS (use live userPricing)
+// ═══════════════════════════════════════
 function getMargin(qty) {
-  if (qty < 36)   return 1.00;
-  if (qty <= 60)  return 0.85;
-  if (qty <= 144) return 0.65;
-  if (qty <= 249) return 0.55;
-  return 0.40;
+  const t = userPricing.marginTiers.find(r => qty >= r.from && qty <= r.to);
+  return t ? t.margin : 0.40;
 }
-function marginLabel(qty) {
-  return (getMargin(qty) * 100).toFixed(0) + '%';
+function marginLabel(qty) { return (getMargin(qty)*100).toFixed(0) + '%'; }
+function htPrice(qty, si) {
+  const t = userPricing.htTiers.find(r => qty >= r.from && qty <= r.to);
+  return (t && t.prices[si] != null) ? t.prices[si] : null;
+}
+function embPrice(qty) {
+  const t = userPricing.embTiers.find(r => qty >= r.from && qty <= r.to);
+  return t ? t.price : null;
+}
+function spPrice(qty, ci) {
+  const t = userPricing.spTiers.find(r => qty >= r.from && qty <= r.to);
+  if (!t || !t.colors[ci]) return null;
+  return t.colors[ci].price + t.colors[ci].setup / qty;
 }
 
-const HT_SIZES = [
-  '1.5″ × 1.5″','2.5″ × 2.5″','4″ × 4″',
-  '5.8″ × 8.3″','11.7″ × 4.25″','16.5″ × 5.85″',
-  '8.3″ × 11.7″','11.7″ × 11.7″','11.7″ × 16.5″'
-];
-
-const HT_TIERS = [
-  { from:10,  to:19,  prices:[2.62,2.95,3.23,4.28,4.28,5.12,5.12,6.43,7.74] },
-  { from:20,  to:49,  prices:[2.18,2.45,2.69,3.57,3.57,4.27,4.27,5.37,6.46] },
-  { from:50,  to:99,  prices:[1.30,1.62,1.96,2.56,2.56,3.30,3.30,4.24,5.20] },
-  { from:100, to:199, prices:[0.87,1.11,1.45,1.77,1.77,2.27,2.27,2.95,3.63] },
-  { from:200, to:299, prices:[0.70,0.93,1.26,1.49,1.49,1.86,1.86,2.43,3.02] },
-  { from:300, to:499, prices:[0.56,0.78,1.10,1.33,1.33,1.71,1.71,2.24,2.78] },
-];
-
-const EMB_TIERS = [
-  { from:1,   to:5,   price:7.00 },
-  { from:6,   to:23,  price:5.50 },
-  { from:24,  to:35,  price:5.25 },
-  { from:36,  to:71,  price:4.75 },
-  { from:72,  to:143, price:4.25 },
-  { from:144, to:500, price:3.25 },
-];
-
-const SP_TIERS = [
-  { from:12,  to:36,  factor:30, base:[2.85,2.95,3.10,3.30,3.50,3.65] },
-  { from:37,  to:60,  factor:30, base:[2.35,2.45,2.60,2.70,2.80,2.90] },
-  { from:61,  to:144, factor:30, base:[2.00,2.05,2.20,2.40,2.55,2.65] },
-  { from:145, to:249, factor:30, base:[1.80,1.90,2.05,2.15,2.35,2.55] },
-  { from:250, to:600, factor:34, base:[1.20,1.25,1.45,1.50,1.65,2.50] },
-];
-
-function htPrice(qty, si)  { const t = HT_TIERS.find(r => qty >= r.from && qty <= r.to); return t ? t.prices[si] : null; }
-function embPrice(qty)     { const t = EMB_TIERS.find(r => qty >= r.from && qty <= r.to); return t ? t.price : null; }
-function spPrice(qty, ci)  { const t = SP_TIERS.find(r => qty >= r.from && qty <= r.to); if (!t) return null; return t.base[ci] + t.factor*(ci+1)/qty; }
-
-// ─────────────────────────────────────────
-//  LOCATION CONFIG
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
+//  LOCATION PANELS
+// ═══════════════════════════════════════
 const LOC_KEYS   = ['front','back','rsleeve','lsleeve'];
-const LOC_LABELS = { front:'Side 1 — Front', back:'Side 2 — Back', rsleeve:'Right Sleeve', lsleeve:'Left Sleeve' };
-const locState   = { front:'none', back:'none', rsleeve:'none', lsleeve:'none' };
+const LOC_LABELS = {front:'Side 1 — Front', back:'Side 2 — Back', rsleeve:'Right Sleeve', lsleeve:'Left Sleeve'};
+const locState   = {front:'none', back:'none', rsleeve:'none', lsleeve:'none'};
 
-const HT_OPTS = HT_SIZES.map((s,i) => `<option value="${i}">${s}</option>`).join('');
-const SP_OPTS = [1,2,3,4,5,6].map((c,i) => `<option value="${i}">${c} Color${c>1?'s':''}</option>`).join('');
-
-function buildPanel(key) {
-  return `
-  <div class="loc-panel" id="panel-${key}">
-    <span class="loc-name">${LOC_LABELS[key]}</span>
-    <div class="loc-pills">
-      <button class="loc-pill active-none" id="pill-${key}-none"       onclick="setLocType('${key}','none')">None</button>
-      <button class="loc-pill"             id="pill-${key}-heat"       onclick="setLocType('${key}','heat')">🔥 Heat Transfer</button>
-      <button class="loc-pill"             id="pill-${key}-embroidery" onclick="setLocType('${key}','embroidery')">🧵 Embroidery</button>
-      <button class="loc-pill"             id="pill-${key}-screen"     onclick="setLocType('${key}','screen')">🖨️ Screen Print</button>
-    </div>
-    <div class="loc-opts hidden" id="opts-${key}-heat">
-      <div class="form-group">
-        <label>Transfer Size</label>
-        <select id="${key}-ht-size" onchange="clearResults()">
-          <option value="">— Select size —</option>${HT_OPTS}
-        </select>
+function buildLocGrid() {
+  const htOpts = HT_SIZE_LABELS.map((s,i) => `<option value="${i}">${s}</option>`).join('');
+  const spOpts = Array.from({length:10},(_,i) => `<option value="${i}">${i+1} Color${i>0?'s':''}</option>`).join('');
+  document.getElementById('loc-grid').innerHTML = LOC_KEYS.map(key => `
+    <div class="loc-panel" id="panel-${key}">
+      <span class="loc-name">${LOC_LABELS[key]}</span>
+      <div class="loc-pills">
+        <button class="loc-pill active-none" id="pill-${key}-none"       onclick="setLocType('${key}','none')">None</button>
+        <button class="loc-pill"             id="pill-${key}-heat"       onclick="setLocType('${key}','heat')">🔥 Heat Transfer</button>
+        <button class="loc-pill"             id="pill-${key}-embroidery" onclick="setLocType('${key}','embroidery')">🧵 Embroidery</button>
+        <button class="loc-pill"             id="pill-${key}-screen"     onclick="setLocType('${key}','screen')">🖨️ Screen Print</button>
       </div>
-    </div>
-    <div class="loc-opts hidden" id="opts-${key}-screen">
-      <div class="form-group">
-        <label>Number of Colors</label>
-        <select id="${key}-sp-colors" onchange="clearResults()">
-          <option value="">— Select —</option>${SP_OPTS}
-        </select>
-        <div class="hint">Setup cost split across qty.</div>
+      <div class="hidden" id="opts-${key}-heat">
+        <div class="form-group">
+          <label>Transfer Size</label>
+          <select id="${key}-ht-size" onchange="clearResults()">
+            <option value="">— Select size —</option>${htOpts}
+          </select>
+        </div>
       </div>
-    </div>
-  </div>`;
+      <div class="hidden" id="opts-${key}-screen">
+        <div class="form-group">
+          <label>Number of Colors</label>
+          <select id="${key}-sp-colors" onchange="clearResults()">
+            <option value="">— Select —</option>${spOpts}
+          </select>
+          <div class="hint">Setup cost is divided across qty.</div>
+        </div>
+      </div>
+    </div>`).join('');
 }
-
-document.getElementById('loc-grid').innerHTML = LOC_KEYS.map(buildPanel).join('');
 
 function setLocType(key, type) {
   locState[key] = type;
-  LOC_KEYS.forEach(() => {});
   ['none','heat','embroidery','screen'].forEach(t => {
     const pill = document.getElementById(`pill-${key}-${t}`);
     pill.classList.remove('active-none','active-type');
     if (t === type) pill.classList.add(type === 'none' ? 'active-none' : 'active-type');
   });
-  const panel = document.getElementById(`panel-${key}`);
-  panel.classList.toggle('active-panel', type !== 'none');
-  ['heat','screen'].forEach(t => {
-    const el = document.getElementById(`opts-${key}-${t}`);
-    if (el) el.classList.toggle('hidden', type !== t);
-  });
+  document.getElementById(`panel-${key}`).classList.toggle('active-panel', type !== 'none');
+  ['heat','screen'].forEach(t =>
+    document.getElementById(`opts-${key}-${t}`)?.classList.toggle('hidden', type !== t)
+  );
   clearResults();
 }
 
-// ─────────────────────────────────────────
-//  QTY → MARGIN HINT
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
+//  QTY CHANGE
+// ═══════════════════════════════════════
 function onQtyChange() {
   const qty = parseInt(document.getElementById('qty').value);
-  const hint = document.getElementById('margin-hint');
-  if (!isNaN(qty) && qty > 0) {
-    hint.textContent = `Margin rate: ${marginLabel(qty)}`;
-  } else {
-    hint.textContent = '';
-  }
+  document.getElementById('margin-hint').textContent =
+    (!isNaN(qty) && qty > 0) ? `Margin rate: ${marginLabel(qty)}` : '';
   clearResults();
 }
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
 //  CALCULATE
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
 const fmt  = n => '$' + n.toFixed(2);
 const fmtK = n => n >= 1000 ? '$' + (n/1000).toFixed(1) + 'K' : '$' + n.toFixed(2);
 
-function showAlert(type, msg) { const el = document.getElementById('alert-'+type); el.textContent = msg; el.classList.add('show'); }
-function clearAlerts() { ['warn','err'].forEach(t => document.getElementById('alert-'+t).classList.remove('show')); }
+function showAlert(msg) { const el = document.getElementById('alert-err'); el.textContent = msg; el.classList.add('show'); }
+function clearAlerts()  { document.getElementById('alert-err').classList.remove('show'); }
 function clearResults() { document.getElementById('results-section').style.display = 'none'; }
 
 function calculate() {
   clearAlerts();
-
   const apparelCost = parseFloat(document.getElementById('apparel-cost').value);
   const qty         = parseInt(document.getElementById('qty').value);
   const clientName  = document.getElementById('client-name').value.trim() || '[Client Name]';
   const garmentDesc = document.getElementById('garment-desc').value.trim() || '[Garment]';
 
-  if (isNaN(apparelCost) || apparelCost < 0) { showAlert('err','Enter a valid apparel cost.'); return; }
-  if (isNaN(qty) || qty < 1)                 { showAlert('err','Enter a valid quantity.'); return; }
+  if (isNaN(apparelCost) || apparelCost < 0) { showAlert('Enter a valid apparel cost.'); return; }
+  if (isNaN(qty) || qty < 1)                 { showAlert('Enter a valid quantity.'); return; }
 
-  // Resolve each active location
   const active = [];
   for (const key of LOC_KEYS) {
     const type = locState[key];
     if (type === 'none') continue;
-
     let price = null, label = '';
 
     if (type === 'heat') {
       const val = document.getElementById(`${key}-ht-size`).value;
-      if (val === '') { showAlert('err', `Select a transfer size for ${LOC_LABELS[key]}.`); return; }
-      const si = parseInt(val);
-      if (qty < 10 || qty > 499) { showAlert('err', `Heat Transfer qty must be 10–499. (${LOC_LABELS[key]})`); return; }
-      price = htPrice(qty, si);
-      if (price === null) { showAlert('err', `No Heat Transfer pricing for qty ${qty}.`); return; }
-      label = `Heat Transfer — ${HT_SIZES[si]}`;
+      if (!val) { showAlert(`Select a transfer size for ${LOC_LABELS[key]}.`); return; }
+      price = htPrice(qty, parseInt(val));
+      if (price === null) { showAlert(`No Heat Transfer pricing for qty ${qty}. Add a tier in Settings → Heat Transfer.`); return; }
+      label = `Heat Transfer — ${HT_SIZE_LABELS[parseInt(val)]}`;
 
     } else if (type === 'embroidery') {
-      if (qty > 500) { showAlert('err', `Embroidery max is 500. (${LOC_LABELS[key]})`); return; }
       price = embPrice(qty);
-      if (price === null) { showAlert('err', `No embroidery pricing for qty ${qty}.`); return; }
+      if (price === null) { showAlert(`No Embroidery pricing for qty ${qty}. Add a tier in Settings → Embroidery.`); return; }
       label = 'Embroidery (6,000 stitches)';
 
     } else if (type === 'screen') {
       const val = document.getElementById(`${key}-sp-colors`).value;
-      if (val === '') { showAlert('err', `Select number of colors for ${LOC_LABELS[key]}.`); return; }
+      if (!val) { showAlert(`Select number of colors for ${LOC_LABELS[key]}.`); return; }
       const ci = parseInt(val);
-      if (qty < 12 || qty > 600) { showAlert('err', `Screen Printing qty must be 12–600. (${LOC_LABELS[key]})`); return; }
       price = spPrice(qty, ci);
-      if (price === null) { showAlert('err', `No Screen Printing pricing for qty ${qty}.`); return; }
-      label = `Screen Printing — ${ci+1} color${ci>0?'s':''}`;
+      if (price === null) { showAlert(`No Screen Print pricing for qty ${qty}. Add a tier in Settings → Screen Print.`); return; }
+      label = `Screen Print — ${ci+1} color${ci>0?'s':''}`;
     }
-
     active.push({ key, locLabel: LOC_LABELS[key], price, label });
   }
 
-  if (active.length === 0) { showAlert('err', 'Select at least one decoration location.'); return; }
+  if (!active.length) { showAlert('Select at least one decoration location.'); return; }
 
-  const totalPrintCost = active.reduce((s, a) => s + a.price, 0);
-  const margin         = getMargin(qty);
-  const subTotal       = totalPrintCost + apparelCost;
-  const totalUnit      = subTotal * (1 + margin);
-  const marginDollars  = (totalUnit - subTotal) * qty;
-  const ipuPerUnit     = totalUnit * IPU_RATE;
-  const ipuTotal       = ipuPerUnit * qty;
-  const profit         = marginDollars - ipuTotal;
-  const totalOrder     = totalUnit * qty;
+  const totalDecor  = active.reduce((s,a) => s + a.price, 0);
+  const margin      = getMargin(qty);
+  const subTotal    = totalDecor + apparelCost;
+  const totalUnit   = subTotal * (1 + margin);
+  const grossMargin = (totalUnit - subTotal) * qty;
+  const totalOrder  = totalUnit * qty;
 
-  // ── Populate results ──
   document.getElementById('r-total-unit').textContent  = fmt(totalUnit);
   document.getElementById('r-total-order').textContent = fmtK(totalOrder);
-  document.getElementById('r-profit').textContent      = fmtK(profit);
+  document.getElementById('r-profit').textContent      = fmtK(grossMargin);
   document.getElementById('r-apparel').textContent     = fmt(apparelCost);
-  document.getElementById('r-print-total').textContent = fmt(totalPrintCost);
+  document.getElementById('r-print-total').textContent = fmt(totalDecor);
   document.getElementById('r-subtotal').textContent    = fmt(subTotal);
   document.getElementById('r-margin-rate').textContent = marginLabel(qty);
-  document.getElementById('r-margin').textContent      = fmtK(marginDollars);
-  document.getElementById('r-ipu-total').textContent   = fmtK(ipuTotal);
-  document.getElementById('r-profit2').textContent     = fmtK(profit);
+  document.getElementById('r-margin').textContent      = fmtK(grossMargin);
 
-  // Location breakdown
   document.getElementById('loc-breakdown').innerHTML = active.map(a =>
     `<div class="loc-line"><span class="lk">${a.locLabel}</span><span class="lv">${a.label} — ${fmt(a.price)}/unit</span></div>`
   ).join('');
 
-  // Build decoration label for quote
-  const decorFull = active.map(a => `${a.locLabel}: ${a.label}`).join('<br>');
-  const decorPlain = active.map(a => `${a.locLabel}: ${a.label}`).join('\n');
-
-  const result = { totalUnit, totalOrder, subTotal, marginDollars, ipuTotal, profit, qty, apparelCost, clientName, garmentDesc, decorFull, decorPlain, active };
+  const result = { totalUnit, totalOrder, subTotal, grossMargin, qty, apparelCost, clientName, garmentDesc, active };
   window._lastResult = result;
-
-  window._quoteHtml = buildQuoteHtml(result);
+  window._quoteHtml  = buildQuoteHtml(result);
   renderQuotePreview(window._quoteHtml);
-
   document.getElementById('results-section').style.display = 'block';
   setTimeout(() => document.getElementById('results-section').scrollIntoView({ behavior:'smooth', block:'start' }), 50);
 }
 
-// ─────────────────────────────────────────
-//  HTML QUOTE
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
+//  QUOTE BUILDER
+// ═══════════════════════════════════════
 function buildQuoteHtml(r) {
-  const today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-  const decorRows = r.active.map(a =>
-    `<tr><td style="padding:3px 4px;color:#666666;width:175px;vertical-align:top;">&#8203;</td><td style="padding:3px 4px;font-size:13px;color:#555;">${escHtml(a.locLabel)}: ${escHtml(a.label)}</td></tr>`
-  ).join('');
-  return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"></head>
+  const qt = userPricing.quoteTemplate;
+  const sig = (qt.signature || DEFAULT_QT.signature).split('\n')
+    .map(l => escHtml(l)).join('<br>');
+  const decorRows = r.active.length > 1
+    ? r.active.map(a =>
+        `<tr><td style="padding:3px 4px;color:#666;width:175px;vertical-align:top;"></td>
+             <td style="padding:3px 4px;font-size:13px;color:#555;">${escHtml(a.locLabel)}: ${escHtml(a.label)}</td></tr>`
+      ).join('') : '';
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#222;background:#fff;font-size:15px;line-height:1.6;">
 <div style="max-width:560px;margin:0 auto;">
-
 <p style="margin:0 0 16px">Hi ${escHtml(r.clientName)},</p>
-<p style="margin:0 0 16px">Thanks for reaching out—here's a first pass on your quote:</p>
-
+<p style="margin:0 0 16px">${escHtml(qt.greeting || DEFAULT_QT.greeting)}</p>
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:2px solid #1a2744;border-bottom:2px solid #1a2744;margin:20px 0;">
   <tr><td colspan="2" style="padding:14px 4px 10px;font-weight:700;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#1a2744;">QUOTE SUMMARY</td></tr>
   <tr><td style="padding:5px 4px;color:#666;width:175px;">Garment:</td><td style="padding:5px 4px;font-weight:600;">${escHtml(r.garmentDesc)}</td></tr>
-  <tr><td style="padding:5px 4px;color:#666;vertical-align:top;">Decoration:</td><td style="padding:5px 4px;font-weight:600;">${r.active.length === 1 ? escHtml(r.active[0].label) : ''}</td></tr>
-  ${r.active.length > 1 ? decorRows : ''}
+  <tr><td style="padding:5px 4px;color:#666;vertical-align:top;">Decoration:</td><td style="padding:5px 4px;font-weight:600;">${r.active.length===1 ? escHtml(r.active[0].label) : ''}</td></tr>
+  ${decorRows}
   <tr><td style="padding:5px 4px;color:#666;">Quantity:</td><td style="padding:5px 4px;font-weight:600;">${r.qty} pieces</td></tr>
   <tr><td style="padding:5px 4px;color:#666;">Price per garment:</td><td style="padding:5px 4px;font-weight:600;">${fmt(r.totalUnit)}</td></tr>
   <tr><td style="padding:14px 4px 10px;color:#444;font-size:15px;">Total:</td><td style="padding:14px 4px 10px;font-weight:700;font-size:20px;color:#e8701a;">${fmt(r.totalOrder)}</td></tr>
 </table>
-
-<p style="margin:0 0 14px;color:#444;">This includes the decoration and is based on the quantity above.</p>
-<p style="margin:0 0 14px;color:#444;">Shipping and sales tax are not included and will be added once we finalize details.</p>
-<p style="margin:0 0 24px;color:#444;">If you want to tweak garment options, sizing, or quantities, I can adjust this quickly. Just let me know what direction you want to go.</p>
-
-<p style="margin:0;color:#222;line-height:1.9;">— Marc<br><strong>4Z Design</strong><br>
-<a href="mailto:marc@4zdesign.com" style="color:#e8701a;text-decoration:none;">marc@4zdesign.com</a></p>
-
+<p style="margin:0 0 14px;color:#444;">${escHtml(qt.body1 || DEFAULT_QT.body1)}</p>
+<p style="margin:0 0 14px;color:#444;">${escHtml(qt.body2 || DEFAULT_QT.body2)}</p>
+<p style="margin:0 0 24px;color:#444;">${escHtml(qt.body3 || DEFAULT_QT.body3)}</p>
+<p style="margin:0;color:#222;line-height:1.9;">${sig}</p>
 </div></body></html>`;
 }
 
 function renderQuotePreview(html) {
   const iframe = document.getElementById('quote-preview');
   iframe.srcdoc = html;
-  iframe.onload = () => {
-    try { iframe.style.height = (iframe.contentDocument.body.scrollHeight + 32) + 'px'; } catch(e){}
-  };
+  iframe.onload = () => { try { iframe.style.height = (iframe.contentDocument.body.scrollHeight + 32) + 'px'; } catch(e){} };
 }
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
 //  COPY / EDIT
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
 function copyHtml() { navigator.clipboard.writeText(window._quoteHtml||'').then(flash); }
-
 function copyPlainText() {
   const r = window._lastResult; if (!r) return;
-  const text = `Hi ${r.clientName},\n\nThanks for reaching out—here's a first pass on your quote:\n\n──────────────────────────────────────\nQUOTE SUMMARY\n──────────────────────────────────────\nGarment:           ${r.garmentDesc}\nDecoration:\n${r.active.map(a=>'  '+a.locLabel+': '+a.label).join('\n')}\nQuantity:          ${r.qty} pieces\nPrice per garment: ${fmt(r.totalUnit)}\nTotal:             ${fmt(r.totalOrder)}\n──────────────────────────────────────\n\nThis includes the decoration and is based on the quantity above.\n\nShipping and sales tax are not included and will be added once we finalize details.\n\nIf you want to tweak garment options, sizing, or quantities, I can adjust this quickly. Just let me know what direction you want to go.\n\n— Marc\n4Z Design\nmarc@4zdesign.com`;
+  const qt = userPricing.quoteTemplate;
+  const text = [
+    `Hi ${r.clientName},`, '',
+    qt.greeting || DEFAULT_QT.greeting, '',
+    '──────────────────────────────────────',
+    'QUOTE SUMMARY',
+    '──────────────────────────────────────',
+    `Garment:           ${r.garmentDesc}`,
+    `Decoration:`,
+    ...r.active.map(a => `  ${a.locLabel}: ${a.label}`),
+    `Quantity:          ${r.qty} pieces`,
+    `Price per garment: ${fmt(r.totalUnit)}`,
+    `Total:             ${fmt(r.totalOrder)}`,
+    '──────────────────────────────────────', '',
+    qt.body1 || DEFAULT_QT.body1, '',
+    qt.body2 || DEFAULT_QT.body2, '',
+    qt.body3 || DEFAULT_QT.body3, '',
+    qt.signature || DEFAULT_QT.signature
+  ].join('\n');
   navigator.clipboard.writeText(text).then(flash);
 }
+function flash() { const f=document.getElementById('copy-flash'); f.classList.add('show'); setTimeout(()=>f.classList.remove('show'),2000); }
+function openEditModal()  { document.getElementById('edit-html-area').value = window._quoteHtml||''; document.getElementById('edit-modal').classList.add('open'); }
+function applyEditedHtml(){ window._quoteHtml = document.getElementById('edit-html-area').value; renderQuotePreview(window._quoteHtml); closeModal('edit-modal'); }
+function closeModal(id)   { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(el => el.addEventListener('click', e => { if(e.target===el) el.classList.remove('open'); }));
 
-function flash() { const f = document.getElementById('copy-flash'); f.classList.add('show'); setTimeout(()=>f.classList.remove('show'),2000); }
-function openEditModal() { document.getElementById('edit-html-area').value = window._quoteHtml||''; document.getElementById('edit-modal').classList.add('open'); }
-function applyEditedHtml() { window._quoteHtml = document.getElementById('edit-html-area').value; renderQuotePreview(window._quoteHtml); closeModal('edit-modal'); }
-
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
 //  RESET
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
 function resetAll() {
-  LOC_KEYS.forEach(k => setLocType(k,'none'));
-  ['apparel-cost','qty','client-name','garment-desc'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('margin-hint').textContent = '';
+  LOC_KEYS.forEach(k => {
+    locState[k] = 'none';
+    ['none','heat','embroidery','screen'].forEach(t => {
+      const p = document.getElementById(`pill-${k}-${t}`);
+      if (p) { p.classList.remove('active-none','active-type'); if(t==='none') p.classList.add('active-none'); }
+    });
+    document.getElementById(`panel-${k}`)?.classList.remove('active-panel');
+    document.getElementById(`opts-${k}-heat`)?.classList.add('hidden');
+    document.getElementById(`opts-${k}-screen`)?.classList.add('hidden');
+  });
+  ['apparel-cost','qty','client-name','garment-desc'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  const mh = document.getElementById('margin-hint'); if(mh) mh.textContent = '';
   clearResults(); clearAlerts();
   window._lastResult = null; window._quoteHtml = '';
 }
 
-// ─────────────────────────────────────────
-//  SAVE / LOAD
-// ─────────────────────────────────────────
-const STORAGE_KEY = '4zd_quotes_v3';
-const loadAll = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY))||[]; } catch { return []; } };
-const saveAll = q => localStorage.setItem(STORAGE_KEY, JSON.stringify(q));
-
-function openSaveModal() {
-  if (!window._lastResult) { alert('Run a calculation first.'); return; }
-  document.getElementById('quote-name').value = window._lastResult.clientName !== '[Client Name]' ? window._lastResult.clientName : '';
-  document.getElementById('save-modal').classList.add('open');
-  setTimeout(() => document.getElementById('quote-name').focus(), 100);
+// ═══════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function saveQuote() {
-  const name = document.getElementById('quote-name').value.trim();
-  if (!name) { document.getElementById('quote-name').style.borderColor='#ef4444'; return; }
-  const r = window._lastResult;
-  const entry = {
-    id: Date.now(), name,
-    date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
-    quoteHtml: window._quoteHtml,
-    result: r,
-    formState: {
-      clientName: r.clientName, garmentDesc: r.garmentDesc,
-      apparelCost: r.apparelCost, qty: r.qty,
-      locState: {...locState},
-      locSelects: Object.fromEntries(LOC_KEYS.flatMap(k => [
-        [`${k}-ht-size`,   document.getElementById(`${k}-ht-size`).value],
-        [`${k}-sp-colors`, document.getElementById(`${k}-sp-colors`).value],
-      ]))
-    }
-  };
-  const all = loadAll(); all.unshift(entry); saveAll(all);
-  closeModal('save-modal');
-}
-
-function openLoadModal() { renderQuoteList(); document.getElementById('load-modal').classList.add('open'); }
-
-function renderQuoteList() {
-  const all = loadAll();
-  const c = document.getElementById('quote-list');
-  if (!all.length) { c.innerHTML='<div class="empty-state">No saved quotes yet.</div>'; return; }
-  c.innerHTML = all.map(q => `
-    <div class="quote-item" onclick="loadQuote(${q.id})">
-      <div>
-        <div class="qi-name">${escHtml(q.name)}</div>
-        <div class="qi-meta">${q.date} · ${q.formState.qty} pcs · ${fmt(q.result.totalUnit)}/ea</div>
-      </div>
-      <button class="qi-del" onclick="deleteQuote(event,${q.id})">🗑</button>
-    </div>`).join('');
-}
-
-function loadQuote(id) {
-  const q = loadAll().find(x => x.id === id); if (!q) return;
-  resetAll();
-  const fs = q.formState;
-  document.getElementById('client-name').value  = fs.clientName||'';
-  document.getElementById('garment-desc').value  = fs.garmentDesc||'';
-  document.getElementById('apparel-cost').value  = fs.apparelCost;
-  document.getElementById('qty').value           = fs.qty;
-  onQtyChange();
-  LOC_KEYS.forEach(k => {
-    if (fs.locState && fs.locState[k]) setLocType(k, fs.locState[k]);
-    if (fs.locSelects) {
-      const htEl = document.getElementById(`${k}-ht-size`);
-      const spEl = document.getElementById(`${k}-sp-colors`);
-      if (htEl && fs.locSelects[`${k}-ht-size`])   htEl.value = fs.locSelects[`${k}-ht-size`];
-      if (spEl && fs.locSelects[`${k}-sp-colors`])  spEl.value = fs.locSelects[`${k}-sp-colors`];
-    }
-  });
-  closeModal('load-modal');
-  setTimeout(() => {
-    calculate();
-    if (q.quoteHtml) { window._quoteHtml = q.quoteHtml; renderQuotePreview(q.quoteHtml); }
-  }, 80);
-}
-
-function deleteQuote(e, id) {
-  e.stopPropagation();
-  if (!confirm('Delete this quote?')) return;
-  saveAll(loadAll().filter(x => x.id !== id)); renderQuoteList();
-}
-
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.overlay').forEach(el => el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); }));
-document.getElementById('quote-name').addEventListener('keydown', e => { if (e.key==='Enter') saveQuote(); });
-
-function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-// ─── Pre-fill from SanMar Search URL params ───────────────────────────────
+// URL param pre-fill (SanMar integration)
 (function() {
-  const params  = new URLSearchParams(window.location.search);
-  const garment = params.get('garment');
-  const cost    = params.get('cost');
-  if (garment) document.getElementById('garment-desc').value  = garment;
-  if (cost)    document.getElementById('apparel-cost').value  = parseFloat(cost).toFixed(2);
-  if (garment || cost) onQtyChange();
+  const p = new URLSearchParams(window.location.search);
+  const g = p.get('garment'), c = p.get('cost');
+  if (g || c) {
+    sb.auth.getSession().then(({data:{session}}) => {
+      if (!session) return;
+      if (g) document.getElementById('garment-desc').value = g;
+      if (c) document.getElementById('apparel-cost').value = parseFloat(c).toFixed(2);
+      if (g||c) onQtyChange();
+    });
+  }
 })();
 </script>
 </body>
