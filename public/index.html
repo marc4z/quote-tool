@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4Z Design — Quote Builder</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #eef0f4; color: #1a2744; min-height: 100vh; }
+
+    header { background: #1a2744; padding: 0 32px; height: 64px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 12px rgba(0,0,0,.25); position: sticky; top: 0; z-index: 50; }
+    .logo { color: #fff; font-size: 1.3rem; font-weight: 800; letter-spacing: -.5px; }
+    .logo span { color: #e8701a; }
+    .logo small { color: rgba(255,255,255,.35); font-weight: 400; font-size: .9rem; margin-left: 8px; }
+    .hdr-btn { background: transparent; border: 1.5px solid rgba(255,255,255,.35); color: #fff; padding: 7px 16px; border-radius: 7px; cursor: pointer; font-size: .85rem; font-weight: 600; transition: all .2s; margin-left: 8px; }
+    .hdr-btn:hover { background: rgba(255,255,255,.12); }
+
+    .main { max-width: 900px; margin: 0 auto; padding: 32px 16px 80px; }
+
+    .card { background: #fff; border-radius: 14px; padding: 28px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+    .card-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #94a3b8; margin-bottom: 18px; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .form-group { display: flex; flex-direction: column; }
+    label { font-size: .82rem; font-weight: 700; color: #374151; margin-bottom: 6px; }
+    .hint { font-size: .75rem; color: #94a3b8; margin-top: 4px; }
+
+    input[type="number"], input[type="text"], select {
+      border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 11px 14px;
+      font-size: .97rem; color: #1a2744; outline: none; width: 100%;
+      transition: border-color .2s, box-shadow .2s; background: #fff; font-family: inherit;
+    }
+    input:focus, select:focus { border-color: #e8701a; box-shadow: 0 0 0 3px rgba(232,112,26,.12); }
+    input[type="number"] { -moz-appearance: textfield; }
+    input[type="number"]::-webkit-inner-spin-button { opacity: .5; }
+
+    /* Location grid */
+    .loc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    .loc-panel {
+      border: 2px solid #e2e8f0; border-radius: 12px; padding: 18px;
+      transition: all .2s; background: #f8fafc;
+    }
+    .loc-panel.active-panel { background: #fff; border-color: #1a2744; }
+
+    .loc-name {
+      font-size: .8rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 1px; color: #94a3b8; margin-bottom: 12px; display: block;
+    }
+    .loc-panel.active-panel .loc-name { color: #1a2744; }
+
+    /* Type pills */
+    .loc-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .loc-pill {
+      border: 1.5px solid #e2e8f0; background: #fff; border-radius: 20px;
+      padding: 5px 12px; font-size: .78rem; font-weight: 700; color: #64748b;
+      cursor: pointer; transition: all .2s; white-space: nowrap;
+    }
+    .loc-pill:hover { border-color: #1a2744; color: #1a2744; }
+    .loc-pill.active-none  { border-color: #94a3b8; background: #f1f5f9; color: #64748b; }
+    .loc-pill.active-type  { border-color: #e8701a; background: #fff8f3; color: #e8701a; }
+
+    /* Per-location options */
+    .loc-opts { margin-top: 4px; }
+    .loc-opts label { font-size: .78rem; }
+
+    .hidden { display: none !important; }
+
+    /* Alert */
+    .alert { border-radius: 9px; padding: 11px 16px; font-size: .84rem; margin-bottom: 16px; display: none; }
+    .alert.warn { background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; }
+    .alert.err  { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+    .alert.show { display: block; }
+
+    .calc-btn { background: linear-gradient(135deg, #e8701a, #d0611a); color: #fff; border: none; border-radius: 11px; padding: 15px; font-size: 1rem; font-weight: 800; cursor: pointer; width: 100%; letter-spacing: .5px; transition: all .2s; }
+    .calc-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(232,112,26,.35); }
+
+    /* Results */
+    #results-section { display: none; }
+
+    .results-card { background: linear-gradient(135deg, #1a2744, #0f1d3a); color: #fff; border-radius: 14px; padding: 28px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(26,39,68,.3); }
+    .results-card .card-title { color: rgba(255,255,255,.45); }
+
+    .results-primary { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 18px; }
+    .res-big { background: rgba(255,255,255,.08); border-radius: 11px; padding: 18px 14px; text-align: center; }
+    .res-big .val { font-size: 2rem; font-weight: 800; color: #f5a623; line-height: 1; }
+    .res-big .lbl { font-size: .75rem; color: rgba(255,255,255,.55); margin-top: 6px; text-transform: uppercase; letter-spacing: .8px; }
+
+    .results-secondary { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+    .res-row { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,.06); border-radius: 9px; padding: 11px 14px; }
+    .res-row .rk { font-size: .82rem; color: rgba(255,255,255,.55); }
+    .res-row .rv { font-size: .9rem; font-weight: 700; }
+    .res-row.highlight .rv { color: #6ee7b7; }
+    .res-row.span2 { grid-column: 1 / -1; }
+
+    /* Active location breakdown */
+    .loc-breakdown { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .loc-line { display: flex; justify-content: space-between; padding: 8px 14px; background: rgba(255,255,255,.04); border-radius: 8px; font-size: .82rem; }
+    .loc-line .lk { color: rgba(255,255,255,.5); }
+    .loc-line .lv { font-weight: 600; }
+
+    /* Quote section */
+    .quote-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .quote-header .card-title { margin: 0; }
+    .quote-actions { display: flex; gap: 10px; margin-top: 14px; }
+
+    .btn-outline { flex: 1; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 11px; font-size: .88rem; font-weight: 700; cursor: pointer; color: #374151; transition: all .2s; }
+    .btn-outline:hover { border-color: #1a2744; color: #1a2744; }
+    .btn-solid { flex: 1; background: #1a2744; color: #fff; border: none; border-radius: 9px; padding: 11px; font-size: .88rem; font-weight: 700; cursor: pointer; transition: all .2s; }
+    .btn-solid:hover { background: #243564; }
+
+    #quote-preview { width: 100%; border: 1.5px solid #e2e8f0; border-radius: 10px; min-height: 380px; display: block; background: #fff; }
+
+    .copy-flash { font-size: .8rem; color: #059669; font-weight: 700; opacity: 0; transition: opacity .3s; }
+    .copy-flash.show { opacity: 1; }
+
+    /* Modals */
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 200; align-items: center; justify-content: center; padding: 16px; }
+    .overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 16px; padding: 28px; width: 100%; max-width: 500px; max-height: 88vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+    .modal-title { font-size: 1.15rem; font-weight: 800; margin-bottom: 6px; }
+    .modal-sub { font-size: .84rem; color: #64748b; margin-bottom: 22px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+    #edit-html-area { width: 100%; min-height: 300px; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 14px; font-size: .8rem; font-family: 'Courier New', monospace; outline: none; resize: vertical; }
+    #edit-html-area:focus { border-color: #e8701a; }
+
+    .quote-list { display: flex; flex-direction: column; gap: 10px; }
+    .quote-item { border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all .2s; }
+    .quote-item:hover { border-color: #1a2744; background: #f8fafc; }
+    .qi-name { font-weight: 700; font-size: .92rem; }
+    .qi-meta { font-size: .78rem; color: #94a3b8; margin-top: 2px; }
+    .qi-del { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1.1rem; padding: 4px 8px; border-radius: 6px; }
+    .qi-del:hover { background: #fee2e2; }
+    .empty-state { text-align: center; color: #94a3b8; padding: 32px; font-size: .9rem; }
+
+    @media (max-width: 620px) {
+      .loc-grid { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+      .results-primary { grid-template-columns: 1fr; }
+      .results-secondary { grid-template-columns: 1fr; }
+      .quote-actions { flex-direction: column; }
+      header { padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">4Z<span>Design</span><small>Quote Builder</small></div>
+  <div>
+    <button class="hdr-btn" onclick="openLoadModal()">📂 Saved Quotes</button>
+    <button class="hdr-btn" onclick="resetAll()">+ New Quote</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- STEP 1: Order Details -->
+  <div class="card">
+    <div class="card-title">Step 1 — Order Details</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="client-name">Client Name</label>
+        <input type="text" id="client-name" placeholder="e.g. Acme Corp" oninput="clearResults()">
+      </div>
+      <div class="form-group">
+        <label for="garment-desc">Garment</label>
+        <input type="text" id="garment-desc" placeholder="e.g. Cotton T-Shirt, Polo, Hoodie" oninput="clearResults()">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="apparel-cost">Apparel Cost Per Piece ($)</label>
+        <input type="number" id="apparel-cost" min="0" step="0.01" placeholder="e.g. 9.00" oninput="clearResults()">
+      </div>
+      <div class="form-group">
+        <label for="qty">Quantity</label>
+        <input type="number" id="qty" min="1" step="1" placeholder="e.g. 50" oninput="onQtyChange()">
+        <div class="hint" id="margin-hint"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: Decoration Locations -->
+  <div class="card">
+    <div class="card-title">Step 2 — Decorations  <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#b0bec5">Select a type for each location you want decorated</span></div>
+    <div class="loc-grid" id="loc-grid">
+      <!-- Injected by JS -->
+    </div>
+  </div>
+
+  <div class="alert warn" id="alert-warn"></div>
+  <div class="alert err"  id="alert-err"></div>
+
+  <button class="calc-btn" onclick="calculate()">Calculate Quote →</button>
+
+  <!-- RESULTS -->
+  <div id="results-section" style="margin-top:20px;">
+
+    <div class="results-card">
+      <div class="card-title">Your Numbers</div>
+
+      <div class="results-primary">
+        <div class="res-big">
+          <div class="val" id="r-total-unit">—</div>
+          <div class="lbl">Price Per Unit</div>
+        </div>
+        <div class="res-big">
+          <div class="val" id="r-total-order">—</div>
+          <div class="lbl">Total Order</div>
+        </div>
+        <div class="res-big">
+          <div class="val" id="r-profit">—</div>
+          <div class="lbl">Net Profit</div>
+        </div>
+      </div>
+
+      <!-- Active location breakdown -->
+      <div class="loc-breakdown" id="loc-breakdown"></div>
+
+      <div class="results-secondary">
+        <div class="res-row">
+          <span class="rk">Apparel Cost</span>
+          <span class="rv" id="r-apparel">—</span>
+        </div>
+        <div class="res-row">
+          <span class="rk">Total Decoration</span>
+          <span class="rv" id="r-print-total">—</span>
+        </div>
+        <div class="res-row">
+          <span class="rk">Sub Total / unit</span>
+          <span class="rv" id="r-subtotal">—</span>
+        </div>
+        <div class="res-row">
+          <span class="rk">Margin Rate</span>
+          <span class="rv" id="r-margin-rate">—</span>
+        </div>
+        <div class="res-row">
+          <span class="rk">Gross Margin $</span>
+          <span class="rv" id="r-margin">—</span>
+        </div>
+        <div class="res-row">
+          <span class="rk">IPU Cost (10%)</span>
+          <span class="rv" id="r-ipu-total">—</span>
+        </div>
+        <div class="res-row highlight span2">
+          <span class="rk">Profit After IPU</span>
+          <span class="rv" id="r-profit2">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- HTML Quote -->
+    <div class="card">
+      <div class="quote-header">
+        <div class="card-title">Client Quote</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="copy-flash" id="copy-flash">Copied!</span>
+          <button class="btn-outline" style="flex:none;padding:7px 14px;font-size:.8rem;" onclick="openEditModal()">✏️ Edit HTML</button>
+        </div>
+      </div>
+      <iframe id="quote-preview" title="Quote Preview" sandbox="allow-same-origin"></iframe>
+      <div class="quote-actions">
+        <button class="btn-outline" onclick="copyHtml()">📋 Copy HTML</button>
+        <button class="btn-outline" onclick="copyPlainText()">📄 Plain Text</button>
+        <button class="btn-solid"   onclick="openSaveModal()">💾 Save Quote</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Edit HTML Modal -->
+<div class="overlay" id="edit-modal">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-title">Edit Quote HTML</div>
+    <div class="modal-sub">Modify then click Apply.</div>
+    <textarea id="edit-html-area"></textarea>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeModal('edit-modal')">Cancel</button>
+      <button class="btn-solid"   onclick="applyEditedHtml()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save Modal -->
+<div class="overlay" id="save-modal">
+  <div class="modal">
+    <div class="modal-title">Save This Quote</div>
+    <div class="modal-sub">Name it so you can pull it back up later.</div>
+    <div class="form-group">
+      <label for="quote-name">Quote Name</label>
+      <input type="text" id="quote-name" placeholder="e.g. Acme Corp — 50 Polos">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeModal('save-modal')">Cancel</button>
+      <button class="btn-solid"   onclick="saveQuote()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Load Modal -->
+<div class="overlay" id="load-modal">
+  <div class="modal">
+    <div class="modal-title">Saved Quotes</div>
+    <div class="modal-sub">Click a quote to restore it.</div>
+    <div class="quote-list" id="quote-list"></div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeModal('load-modal')" style="flex:none;padding:11px 24px;">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────
+//  PRICING DATA
+// ─────────────────────────────────────────
+const IPU_RATE = 0.10;
+
+// Margin lookup — =IFS(qty<36,100%,qty<=60,85%,qty<=144,65%,qty<=249,55%,qty>=250,40%)
+function getMargin(qty) {
+  if (qty < 36)   return 1.00;
+  if (qty <= 60)  return 0.85;
+  if (qty <= 144) return 0.65;
+  if (qty <= 249) return 0.55;
+  return 0.40;
+}
+function marginLabel(qty) {
+  return (getMargin(qty) * 100).toFixed(0) + '%';
+}
+
+const HT_SIZES = [
+  '1.5″ × 1.5″','2.5″ × 2.5″','4″ × 4″',
+  '5.8″ × 8.3″','11.7″ × 4.25″','16.5″ × 5.85″',
+  '8.3″ × 11.7″','11.7″ × 11.7″','11.7″ × 16.5″'
+];
+
+const HT_TIERS = [
+  { from:10,  to:19,  prices:[2.62,2.95,3.23,4.28,4.28,5.12,5.12,6.43,7.74] },
+  { from:20,  to:49,  prices:[2.18,2.45,2.69,3.57,3.57,4.27,4.27,5.37,6.46] },
+  { from:50,  to:99,  prices:[1.30,1.62,1.96,2.56,2.56,3.30,3.30,4.24,5.20] },
+  { from:100, to:199, prices:[0.87,1.11,1.45,1.77,1.77,2.27,2.27,2.95,3.63] },
+  { from:200, to:299, prices:[0.70,0.93,1.26,1.49,1.49,1.86,1.86,2.43,3.02] },
+  { from:300, to:499, prices:[0.56,0.78,1.10,1.33,1.33,1.71,1.71,2.24,2.78] },
+];
+
+const EMB_TIERS = [
+  { from:1,   to:5,   price:7.00 },
+  { from:6,   to:23,  price:5.50 },
+  { from:24,  to:35,  price:5.25 },
+  { from:36,  to:71,  price:4.75 },
+  { from:72,  to:143, price:4.25 },
+  { from:144, to:500, price:3.25 },
+];
+
+const SP_TIERS = [
+  { from:12,  to:36,  factor:30, base:[2.85,2.95,3.10,3.30,3.50,3.65] },
+  { from:37,  to:60,  factor:30, base:[2.35,2.45,2.60,2.70,2.80,2.90] },
+  { from:61,  to:144, factor:30, base:[2.00,2.05,2.20,2.40,2.55,2.65] },
+  { from:145, to:249, factor:30, base:[1.80,1.90,2.05,2.15,2.35,2.55] },
+  { from:250, to:600, factor:34, base:[1.20,1.25,1.45,1.50,1.65,2.50] },
+];
+
+function htPrice(qty, si)  { const t = HT_TIERS.find(r => qty >= r.from && qty <= r.to); return t ? t.prices[si] : null; }
+function embPrice(qty)     { const t = EMB_TIERS.find(r => qty >= r.from && qty <= r.to); return t ? t.price : null; }
+function spPrice(qty, ci)  { const t = SP_TIERS.find(r => qty >= r.from && qty <= r.to); if (!t) return null; return t.base[ci] + t.factor*(ci+1)/qty; }
+
+// ─────────────────────────────────────────
+//  LOCATION CONFIG
+// ─────────────────────────────────────────
+const LOC_KEYS   = ['front','back','rsleeve','lsleeve'];
+const LOC_LABELS = { front:'Side 1 — Front', back:'Side 2 — Back', rsleeve:'Right Sleeve', lsleeve:'Left Sleeve' };
+const locState   = { front:'none', back:'none', rsleeve:'none', lsleeve:'none' };
+
+const HT_OPTS = HT_SIZES.map((s,i) => `<option value="${i}">${s}</option>`).join('');
+const SP_OPTS = [1,2,3,4,5,6].map((c,i) => `<option value="${i}">${c} Color${c>1?'s':''}</option>`).join('');
+
+function buildPanel(key) {
+  return `
+  <div class="loc-panel" id="panel-${key}">
+    <span class="loc-name">${LOC_LABELS[key]}</span>
+    <div class="loc-pills">
+      <button class="loc-pill active-none" id="pill-${key}-none"       onclick="setLocType('${key}','none')">None</button>
+      <button class="loc-pill"             id="pill-${key}-heat"       onclick="setLocType('${key}','heat')">🔥 Heat Transfer</button>
+      <button class="loc-pill"             id="pill-${key}-embroidery" onclick="setLocType('${key}','embroidery')">🧵 Embroidery</button>
+      <button class="loc-pill"             id="pill-${key}-screen"     onclick="setLocType('${key}','screen')">🖨️ Screen Print</button>
+    </div>
+    <div class="loc-opts hidden" id="opts-${key}-heat">
+      <div class="form-group">
+        <label>Transfer Size</label>
+        <select id="${key}-ht-size" onchange="clearResults()">
+          <option value="">— Select size —</option>${HT_OPTS}
+        </select>
+      </div>
+    </div>
+    <div class="loc-opts hidden" id="opts-${key}-screen">
+      <div class="form-group">
+        <label>Number of Colors</label>
+        <select id="${key}-sp-colors" onchange="clearResults()">
+          <option value="">— Select —</option>${SP_OPTS}
+        </select>
+        <div class="hint">Setup cost split across qty.</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+document.getElementById('loc-grid').innerHTML = LOC_KEYS.map(buildPanel).join('');
+
+function setLocType(key, type) {
+  locState[key] = type;
+  LOC_KEYS.forEach(() => {});
+  ['none','heat','embroidery','screen'].forEach(t => {
+    const pill = document.getElementById(`pill-${key}-${t}`);
+    pill.classList.remove('active-none','active-type');
+    if (t === type) pill.classList.add(type === 'none' ? 'active-none' : 'active-type');
+  });
+  const panel = document.getElementById(`panel-${key}`);
+  panel.classList.toggle('active-panel', type !== 'none');
+  ['heat','screen'].forEach(t => {
+    const el = document.getElementById(`opts-${key}-${t}`);
+    if (el) el.classList.toggle('hidden', type !== t);
+  });
+  clearResults();
+}
+
+// ─────────────────────────────────────────
+//  QTY → MARGIN HINT
+// ─────────────────────────────────────────
+function onQtyChange() {
+  const qty = parseInt(document.getElementById('qty').value);
+  const hint = document.getElementById('margin-hint');
+  if (!isNaN(qty) && qty > 0) {
+    hint.textContent = `Margin rate: ${marginLabel(qty)}`;
+  } else {
+    hint.textContent = '';
+  }
+  clearResults();
+}
+
+// ─────────────────────────────────────────
+//  CALCULATE
+// ─────────────────────────────────────────
+const fmt  = n => '$' + n.toFixed(2);
+const fmtK = n => n >= 1000 ? '$' + (n/1000).toFixed(1) + 'K' : '$' + n.toFixed(2);
+
+function showAlert(type, msg) { const el = document.getElementById('alert-'+type); el.textContent = msg; el.classList.add('show'); }
+function clearAlerts() { ['warn','err'].forEach(t => document.getElementById('alert-'+t).classList.remove('show')); }
+function clearResults() { document.getElementById('results-section').style.display = 'none'; }
+
+function calculate() {
+  clearAlerts();
+
+  const apparelCost = parseFloat(document.getElementById('apparel-cost').value);
+  const qty         = parseInt(document.getElementById('qty').value);
+  const clientName  = document.getElementById('client-name').value.trim() || '[Client Name]';
+  const garmentDesc = document.getElementById('garment-desc').value.trim() || '[Garment]';
+
+  if (isNaN(apparelCost) || apparelCost < 0) { showAlert('err','Enter a valid apparel cost.'); return; }
+  if (isNaN(qty) || qty < 1)                 { showAlert('err','Enter a valid quantity.'); return; }
+
+  // Resolve each active location
+  const active = [];
+  for (const key of LOC_KEYS) {
+    const type = locState[key];
+    if (type === 'none') continue;
+
+    let price = null, label = '';
+
+    if (type === 'heat') {
+      const val = document.getElementById(`${key}-ht-size`).value;
+      if (val === '') { showAlert('err', `Select a transfer size for ${LOC_LABELS[key]}.`); return; }
+      const si = parseInt(val);
+      if (qty < 10 || qty > 499) { showAlert('err', `Heat Transfer qty must be 10–499. (${LOC_LABELS[key]})`); return; }
+      price = htPrice(qty, si);
+      if (price === null) { showAlert('err', `No Heat Transfer pricing for qty ${qty}.`); return; }
+      label = `Heat Transfer — ${HT_SIZES[si]}`;
+
+    } else if (type === 'embroidery') {
+      if (qty > 500) { showAlert('err', `Embroidery max is 500. (${LOC_LABELS[key]})`); return; }
+      price = embPrice(qty);
+      if (price === null) { showAlert('err', `No embroidery pricing for qty ${qty}.`); return; }
+      label = 'Embroidery (6,000 stitches)';
+
+    } else if (type === 'screen') {
+      const val = document.getElementById(`${key}-sp-colors`).value;
+      if (val === '') { showAlert('err', `Select number of colors for ${LOC_LABELS[key]}.`); return; }
+      const ci = parseInt(val);
+      if (qty < 12 || qty > 600) { showAlert('err', `Screen Printing qty must be 12–600. (${LOC_LABELS[key]})`); return; }
+      price = spPrice(qty, ci);
+      if (price === null) { showAlert('err', `No Screen Printing pricing for qty ${qty}.`); return; }
+      label = `Screen Printing — ${ci+1} color${ci>0?'s':''}`;
+    }
+
+    active.push({ key, locLabel: LOC_LABELS[key], price, label });
+  }
+
+  if (active.length === 0) { showAlert('err', 'Select at least one decoration location.'); return; }
+
+  const totalPrintCost = active.reduce((s, a) => s + a.price, 0);
+  const margin         = getMargin(qty);
+  const subTotal       = totalPrintCost + apparelCost;
+  const totalUnit      = subTotal * (1 + margin);
+  const marginDollars  = (totalUnit - subTotal) * qty;
+  const ipuPerUnit     = totalUnit * IPU_RATE;
+  const ipuTotal       = ipuPerUnit * qty;
+  const profit         = marginDollars - ipuTotal;
+  const totalOrder     = totalUnit * qty;
+
+  // ── Populate results ──
+  document.getElementById('r-total-unit').textContent  = fmt(totalUnit);
+  document.getElementById('r-total-order').textContent = fmtK(totalOrder);
+  document.getElementById('r-profit').textContent      = fmtK(profit);
+  document.getElementById('r-apparel').textContent     = fmt(apparelCost);
+  document.getElementById('r-print-total').textContent = fmt(totalPrintCost);
+  document.getElementById('r-subtotal').textContent    = fmt(subTotal);
+  document.getElementById('r-margin-rate').textContent = marginLabel(qty);
+  document.getElementById('r-margin').textContent      = fmtK(marginDollars);
+  document.getElementById('r-ipu-total').textContent   = fmtK(ipuTotal);
+  document.getElementById('r-profit2').textContent     = fmtK(profit);
+
+  // Location breakdown
+  document.getElementById('loc-breakdown').innerHTML = active.map(a =>
+    `<div class="loc-line"><span class="lk">${a.locLabel}</span><span class="lv">${a.label} — ${fmt(a.price)}/unit</span></div>`
+  ).join('');
+
+  // Build decoration label for quote
+  const decorFull = active.map(a => `${a.locLabel}: ${a.label}`).join('<br>');
+  const decorPlain = active.map(a => `${a.locLabel}: ${a.label}`).join('\n');
+
+  const result = { totalUnit, totalOrder, subTotal, marginDollars, ipuTotal, profit, qty, apparelCost, clientName, garmentDesc, decorFull, decorPlain, active };
+  window._lastResult = result;
+
+  window._quoteHtml = buildQuoteHtml(result);
+  renderQuotePreview(window._quoteHtml);
+
+  document.getElementById('results-section').style.display = 'block';
+  setTimeout(() => document.getElementById('results-section').scrollIntoView({ behavior:'smooth', block:'start' }), 50);
+}
+
+// ─────────────────────────────────────────
+//  HTML QUOTE
+// ─────────────────────────────────────────
+function buildQuoteHtml(r) {
+  const today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  const decorRows = r.active.map(a =>
+    `<tr><td style="padding:3px 4px;color:#666666;width:175px;vertical-align:top;">&#8203;</td><td style="padding:3px 4px;font-size:13px;color:#555;">${escHtml(a.locLabel)}: ${escHtml(a.label)}</td></tr>`
+  ).join('');
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#222;background:#fff;font-size:15px;line-height:1.6;">
+<div style="max-width:560px;margin:0 auto;">
+
+<p style="margin:0 0 16px">Hi ${escHtml(r.clientName)},</p>
+<p style="margin:0 0 16px">Thanks for reaching out—here's a first pass on your quote:</p>
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:2px solid #1a2744;border-bottom:2px solid #1a2744;margin:20px 0;">
+  <tr><td colspan="2" style="padding:14px 4px 10px;font-weight:700;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#1a2744;">QUOTE SUMMARY</td></tr>
+  <tr><td style="padding:5px 4px;color:#666;width:175px;">Garment:</td><td style="padding:5px 4px;font-weight:600;">${escHtml(r.garmentDesc)}</td></tr>
+  <tr><td style="padding:5px 4px;color:#666;vertical-align:top;">Decoration:</td><td style="padding:5px 4px;font-weight:600;">${r.active.length === 1 ? escHtml(r.active[0].label) : ''}</td></tr>
+  ${r.active.length > 1 ? decorRows : ''}
+  <tr><td style="padding:5px 4px;color:#666;">Quantity:</td><td style="padding:5px 4px;font-weight:600;">${r.qty} pieces</td></tr>
+  <tr><td style="padding:5px 4px;color:#666;">Price per garment:</td><td style="padding:5px 4px;font-weight:600;">${fmt(r.totalUnit)}</td></tr>
+  <tr><td style="padding:14px 4px 10px;color:#444;font-size:15px;">Total:</td><td style="padding:14px 4px 10px;font-weight:700;font-size:20px;color:#e8701a;">${fmt(r.totalOrder)}</td></tr>
+</table>
+
+<p style="margin:0 0 14px;color:#444;">This includes the decoration and is based on the quantity above.</p>
+<p style="margin:0 0 14px;color:#444;">Shipping and sales tax are not included and will be added once we finalize details.</p>
+<p style="margin:0 0 24px;color:#444;">If you want to tweak garment options, sizing, or quantities, I can adjust this quickly. Just let me know what direction you want to go.</p>
+
+<p style="margin:0;color:#222;line-height:1.9;">— Marc<br><strong>4Z Design</strong><br>
+<a href="mailto:marc@4zdesign.com" style="color:#e8701a;text-decoration:none;">marc@4zdesign.com</a></p>
+
+</div></body></html>`;
+}
+
+function renderQuotePreview(html) {
+  const iframe = document.getElementById('quote-preview');
+  iframe.srcdoc = html;
+  iframe.onload = () => {
+    try { iframe.style.height = (iframe.contentDocument.body.scrollHeight + 32) + 'px'; } catch(e){}
+  };
+}
+
+// ─────────────────────────────────────────
+//  COPY / EDIT
+// ─────────────────────────────────────────
+function copyHtml() { navigator.clipboard.writeText(window._quoteHtml||'').then(flash); }
+
+function copyPlainText() {
+  const r = window._lastResult; if (!r) return;
+  const text = `Hi ${r.clientName},\n\nThanks for reaching out—here's a first pass on your quote:\n\n──────────────────────────────────────\nQUOTE SUMMARY\n──────────────────────────────────────\nGarment:           ${r.garmentDesc}\nDecoration:\n${r.active.map(a=>'  '+a.locLabel+': '+a.label).join('\n')}\nQuantity:          ${r.qty} pieces\nPrice per garment: ${fmt(r.totalUnit)}\nTotal:             ${fmt(r.totalOrder)}\n──────────────────────────────────────\n\nThis includes the decoration and is based on the quantity above.\n\nShipping and sales tax are not included and will be added once we finalize details.\n\nIf you want to tweak garment options, sizing, or quantities, I can adjust this quickly. Just let me know what direction you want to go.\n\n— Marc\n4Z Design\nmarc@4zdesign.com`;
+  navigator.clipboard.writeText(text).then(flash);
+}
+
+function flash() { const f = document.getElementById('copy-flash'); f.classList.add('show'); setTimeout(()=>f.classList.remove('show'),2000); }
+function openEditModal() { document.getElementById('edit-html-area').value = window._quoteHtml||''; document.getElementById('edit-modal').classList.add('open'); }
+function applyEditedHtml() { window._quoteHtml = document.getElementById('edit-html-area').value; renderQuotePreview(window._quoteHtml); closeModal('edit-modal'); }
+
+// ─────────────────────────────────────────
+//  RESET
+// ─────────────────────────────────────────
+function resetAll() {
+  LOC_KEYS.forEach(k => setLocType(k,'none'));
+  ['apparel-cost','qty','client-name','garment-desc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('margin-hint').textContent = '';
+  clearResults(); clearAlerts();
+  window._lastResult = null; window._quoteHtml = '';
+}
+
+// ─────────────────────────────────────────
+//  SAVE / LOAD
+// ─────────────────────────────────────────
+const STORAGE_KEY = '4zd_quotes_v3';
+const loadAll = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY))||[]; } catch { return []; } };
+const saveAll = q => localStorage.setItem(STORAGE_KEY, JSON.stringify(q));
+
+function openSaveModal() {
+  if (!window._lastResult) { alert('Run a calculation first.'); return; }
+  document.getElementById('quote-name').value = window._lastResult.clientName !== '[Client Name]' ? window._lastResult.clientName : '';
+  document.getElementById('save-modal').classList.add('open');
+  setTimeout(() => document.getElementById('quote-name').focus(), 100);
+}
+
+function saveQuote() {
+  const name = document.getElementById('quote-name').value.trim();
+  if (!name) { document.getElementById('quote-name').style.borderColor='#ef4444'; return; }
+  const r = window._lastResult;
+  const entry = {
+    id: Date.now(), name,
+    date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
+    quoteHtml: window._quoteHtml,
+    result: r,
+    formState: {
+      clientName: r.clientName, garmentDesc: r.garmentDesc,
+      apparelCost: r.apparelCost, qty: r.qty,
+      locState: {...locState},
+      locSelects: Object.fromEntries(LOC_KEYS.flatMap(k => [
+        [`${k}-ht-size`,   document.getElementById(`${k}-ht-size`).value],
+        [`${k}-sp-colors`, document.getElementById(`${k}-sp-colors`).value],
+      ]))
+    }
+  };
+  const all = loadAll(); all.unshift(entry); saveAll(all);
+  closeModal('save-modal');
+}
+
+function openLoadModal() { renderQuoteList(); document.getElementById('load-modal').classList.add('open'); }
+
+function renderQuoteList() {
+  const all = loadAll();
+  const c = document.getElementById('quote-list');
+  if (!all.length) { c.innerHTML='<div class="empty-state">No saved quotes yet.</div>'; return; }
+  c.innerHTML = all.map(q => `
+    <div class="quote-item" onclick="loadQuote(${q.id})">
+      <div>
+        <div class="qi-name">${escHtml(q.name)}</div>
+        <div class="qi-meta">${q.date} · ${q.formState.qty} pcs · ${fmt(q.result.totalUnit)}/ea</div>
+      </div>
+      <button class="qi-del" onclick="deleteQuote(event,${q.id})">🗑</button>
+    </div>`).join('');
+}
+
+function loadQuote(id) {
+  const q = loadAll().find(x => x.id === id); if (!q) return;
+  resetAll();
+  const fs = q.formState;
+  document.getElementById('client-name').value  = fs.clientName||'';
+  document.getElementById('garment-desc').value  = fs.garmentDesc||'';
+  document.getElementById('apparel-cost').value  = fs.apparelCost;
+  document.getElementById('qty').value           = fs.qty;
+  onQtyChange();
+  LOC_KEYS.forEach(k => {
+    if (fs.locState && fs.locState[k]) setLocType(k, fs.locState[k]);
+    if (fs.locSelects) {
+      const htEl = document.getElementById(`${k}-ht-size`);
+      const spEl = document.getElementById(`${k}-sp-colors`);
+      if (htEl && fs.locSelects[`${k}-ht-size`])   htEl.value = fs.locSelects[`${k}-ht-size`];
+      if (spEl && fs.locSelects[`${k}-sp-colors`])  spEl.value = fs.locSelects[`${k}-sp-colors`];
+    }
+  });
+  closeModal('load-modal');
+  setTimeout(() => {
+    calculate();
+    if (q.quoteHtml) { window._quoteHtml = q.quoteHtml; renderQuotePreview(q.quoteHtml); }
+  }, 80);
+}
+
+function deleteQuote(e, id) {
+  e.stopPropagation();
+  if (!confirm('Delete this quote?')) return;
+  saveAll(loadAll().filter(x => x.id !== id)); renderQuoteList();
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(el => el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); }));
+document.getElementById('quote-name').addEventListener('keydown', e => { if (e.key==='Enter') saveQuote(); });
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ─── Pre-fill from SanMar Search URL params ───────────────────────────────
+(function() {
+  const params  = new URLSearchParams(window.location.search);
+  const garment = params.get('garment');
+  const cost    = params.get('cost');
+  if (garment) document.getElementById('garment-desc').value  = garment;
+  if (cost)    document.getElementById('apparel-cost').value  = parseFloat(cost).toFixed(2);
+  if (garment || cost) onQtyChange();
+})();
+</script>
+</body>
+</html>
