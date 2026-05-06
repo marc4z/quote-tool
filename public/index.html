@@ -440,13 +440,7 @@ function showAuthErr(msg) {
 
 async function signOut() {
   try { await sb.auth.signOut(); } catch(e) { console.warn('signOut:', e); }
-  // Force UI reset regardless — handles any stuck session state
-  currentUser = null;
-  document.getElementById('auth-screen').classList.remove('hidden');
-  document.getElementById('app').classList.add('hidden');
-  document.getElementById('auth-email').value = '';
-  document.getElementById('auth-pass').value  = '';
-  document.getElementById('auth-error').classList.remove('show');
+  window.location.reload();
 }
 
 sb.auth.onAuthStateChange(async (event, session) => {
