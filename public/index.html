@@ -136,10 +136,11 @@
     .stbl th { background: #f1f5f9; padding: 8px 8px; text-align: center; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #64748b; border: 1px solid #e2e8f0; white-space: nowrap; }
     .stbl td { padding: 5px 5px; border: 1px solid #e2e8f0; text-align: center; background: #fff; }
     .stbl tbody tr:hover td { background: #fffbf7; }
-    .stbl input[type="number"] { border: 1px solid #d1d5db; border-radius: 6px; padding: 4px 6px; font-size: .82rem; text-align: center; width: 62px; font-family: inherit; color: #1a2744; background: #fff; box-shadow: none; }
+    .stbl input[type="number"] { border: 1px solid #d1d5db; border-radius: 6px; padding: 4px 6px; font-size: .82rem; text-align: center; width: 70px; font-family: inherit; color: #1a2744; background: #fff; box-shadow: none; }
     .stbl input[type="number"]:focus { border-color: #e8701a; outline: none; box-shadow: 0 0 0 2px rgba(232,112,26,.12); }
-    .stbl input.w52 { width: 52px; }
-    .stbl input.w72 { width: 72px; }
+    .stbl input.w52 { width: 60px; }
+    .stbl input.w72 { width: 80px; }
+    .stbl input.w68 { width: 68px; }
     .stbl .del-btn { background: none; border: none; cursor: pointer; color: #ef4444; font-size: 1rem; padding: 4px 8px; border-radius: 6px; }
     .stbl .del-btn:hover { background: #fee2e2; }
     .sp-sub { font-size: .65rem; color: #94a3b8; display: block; }
@@ -359,24 +360,14 @@ const DEFAULT_EMB = [
   {from:144, to:500, price:3.25},
 ];
 
-// SP: each tier has 10 color entries {price (run cost/piece), setup (total screen setup $)}
-// Decoration cost = price + setup/qty
+// SP: each tier has 10 price entries (run cost/piece per color count) + one setup cost per screen
+// Decoration cost = colors[ci] + (setup * numColors) / qty
 const DEFAULT_SP = [
-  {from:12,  to:36,  colors:[
-    {price:2.85,setup:30},{price:2.95,setup:60},{price:3.10,setup:90},{price:3.30,setup:120},{price:3.50,setup:150},
-    {price:3.65,setup:180},{price:3.85,setup:210},{price:4.00,setup:240},{price:4.20,setup:270},{price:4.40,setup:300}]},
-  {from:37,  to:60,  colors:[
-    {price:2.35,setup:30},{price:2.45,setup:60},{price:2.60,setup:90},{price:2.70,setup:120},{price:2.80,setup:150},
-    {price:2.90,setup:180},{price:3.05,setup:210},{price:3.15,setup:240},{price:3.30,setup:270},{price:3.45,setup:300}]},
-  {from:61,  to:144, colors:[
-    {price:2.00,setup:30},{price:2.05,setup:60},{price:2.20,setup:90},{price:2.40,setup:120},{price:2.55,setup:150},
-    {price:2.65,setup:180},{price:2.80,setup:210},{price:2.95,setup:240},{price:3.10,setup:270},{price:3.25,setup:300}]},
-  {from:145, to:249, colors:[
-    {price:1.80,setup:30},{price:1.90,setup:60},{price:2.05,setup:90},{price:2.15,setup:120},{price:2.35,setup:150},
-    {price:2.55,setup:180},{price:2.70,setup:210},{price:2.85,setup:240},{price:3.00,setup:270},{price:3.15,setup:300}]},
-  {from:250, to:600, colors:[
-    {price:1.20,setup:34},{price:1.25,setup:68},{price:1.45,setup:102},{price:1.50,setup:136},{price:1.65,setup:170},
-    {price:2.50,setup:204},{price:2.65,setup:238},{price:2.80,setup:272},{price:2.95,setup:306},{price:3.10,setup:340}]},
+  {from:12,  to:36,  setup:30, colors:[2.85,2.95,3.10,3.30,3.50,3.65,3.85,4.00,4.20,4.40]},
+  {from:37,  to:60,  setup:30, colors:[2.35,2.45,2.60,2.70,2.80,2.90,3.05,3.15,3.30,3.45]},
+  {from:61,  to:144, setup:30, colors:[2.00,2.05,2.20,2.40,2.55,2.65,2.80,2.95,3.10,3.25]},
+  {from:145, to:249, setup:30, colors:[1.80,1.90,2.05,2.15,2.35,2.55,2.70,2.85,3.00,3.15]},
+  {from:250, to:600, setup:34, colors:[1.20,1.25,1.45,1.50,1.65,2.50,2.65,2.80,2.95,3.10]},
 ];
 
 const DEFAULT_MARGIN = [
@@ -448,7 +439,14 @@ function showAuthErr(msg) {
 }
 
 async function signOut() {
-  await sb.auth.signOut();
+  try { await sb.auth.signOut(); } catch(e) { console.warn('signOut:', e); }
+  // Force UI reset regardless — handles any stuck session state
+  currentUser = null;
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('auth-email').value = '';
+  document.getElementById('auth-pass').value  = '';
+  document.getElementById('auth-error').classList.remove('show');
 }
 
 sb.auth.onAuthStateChange(async (event, session) => {
@@ -475,6 +473,18 @@ sb.auth.onAuthStateChange(async (event, session) => {
 // ═══════════════════════════════════════
 //  SUPABASE DATA
 // ═══════════════════════════════════════
+// Migrate old SP format {colors:[{price,setup}]} → new format {setup, colors:[prices]}
+function migrateSpPricing(spData) {
+  if (!Array.isArray(spData)) return deepClone(DEFAULT_SP);
+  return spData.map(t => {
+    if (Array.isArray(t.colors) && t.colors.length > 0 && typeof t.colors[0] === 'object' && 'price' in t.colors[0]) {
+      // Old format — extract setup from first color (was per-color-count, divide by 1 to get per-screen cost)
+      return { from: t.from, to: t.to, setup: t.colors[0].setup || 30, colors: t.colors.map(c => c.price || 0) };
+    }
+    return t; // already new format
+  });
+}
+
 async function loadUserSettings() {
   const { data, error } = await sb
     .from('user_settings').select('*')
@@ -483,7 +493,7 @@ async function loadUserSettings() {
   if (!data) return;
   if (data.ht_pricing)      userPricing.htTiers      = data.ht_pricing;
   if (data.emb_pricing)     userPricing.embTiers      = data.emb_pricing;
-  if (data.sp_pricing)      userPricing.spTiers       = data.sp_pricing;
+  if (data.sp_pricing)      userPricing.spTiers       = migrateSpPricing(data.sp_pricing);
   if (data.margin_settings) userPricing.marginTiers   = data.margin_settings;
   if (data.quote_template) {
     try {
@@ -625,30 +635,25 @@ function collectEmbTiers() {
 // ─── SCREEN PRINT ───────────────────────────────
 function renderSpTab() {
   const tiers = userPricing.spTiers;
-  const colHdrs = Array.from({length:10},(_,i) => `<th colspan="2">${i+1} Color${i>0?'s':''}</th>`).join('');
-  const subHdrs = Array.from({length:10}, () =>
-    `<th style="font-size:.65rem;">Price</th><th style="font-size:.65rem;background:#f8fafc;">Setup$</th>`
-  ).join('');
+  const colHdrs = Array.from({length:10},(_,i) => `<th>${i+1} Color${i>0?'s':''}</th>`).join('');
   const rows = tiers.map((t, ri) => {
-    const cCells = Array.from({length:10}, (_,ci) => {
-      const c = t.colors[ci] || {price:0,setup:0};
-      return `<td><input type="number" step="0.01" min="0" value="${(c.price||0).toFixed(2)}" data-sp="${ri}-${ci}-price" class="w52"></td>
-              <td style="background:#fafffe;"><input type="number" step="1" min="0" value="${c.setup||0}" data-sp="${ri}-${ci}-setup" class="w52"></td>`;
-    }).join('');
+    const cCells = Array.from({length:10}, (_,ci) =>
+      `<td><input type="number" step="0.01" min="0" value="${(t.colors[ci]||0).toFixed(2)}" data-sp-price="${ri}-${ci}" class="w68"></td>`
+    ).join('');
     return `<tr>
       <td><input type="number" step="1" min="0" value="${t.from}" data-sp-from="${ri}" class="w52"></td>
       <td><input type="number" step="1" min="0" value="${t.to}"   data-sp-to="${ri}"   class="w52"></td>
       ${cCells}
+      <td style="background:#f8fafc;"><input type="number" step="0.01" min="0" value="${(t.setup||30).toFixed(2)}" data-sp-setup="${ri}" class="w68"></td>
       <td><button class="del-btn" onclick="delSpRow(${ri})">✕</button></td>
     </tr>`;
   }).join('');
   document.getElementById('stab-sp').innerHTML = `
-    <p class="section-note"><strong>Price</strong> = run cost per piece. <strong>Setup$</strong> = total screen setup cost for that color count (e.g. $30 for 1 color, $60 for 2). Setup is divided by qty at calculation. Final cost = Price + Setup÷Qty.</p>
+    <p class="section-note"><strong>Price columns</strong> = run cost per piece for each color count. <strong>Setup$/screen</strong> = your cost per screen (one per color). Total setup = Setup$ × colors, spread across qty. Final decoration cost = Price + (Setup × colors ÷ qty).</p>
     <div class="stbl-wrap">
       <table class="stbl">
         <thead>
-          <tr><th rowspan="2">From</th><th rowspan="2">To</th>${colHdrs}<th rowspan="2"></th></tr>
-          <tr>${subHdrs}</tr>
+          <tr><th>From</th><th>To</th>${colHdrs}<th style="background:#f1f5f9;">Setup$/screen</th><th></th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -661,7 +666,8 @@ function addSpRow() {
   const last = userPricing.spTiers.at(-1);
   userPricing.spTiers.push({
     from: last ? last.to+1 : 12, to: last ? last.to+100 : 99,
-    colors: Array.from({length:10}, (_,i) => ({price:0, setup:(i+1)*30}))
+    setup: 30,
+    colors: Array(10).fill(0)
   });
   renderSpTab();
 }
@@ -669,16 +675,13 @@ function delSpRow(ri) { collectSpTiers(); userPricing.spTiers.splice(ri,1); rend
 
 function collectSpTiers() {
   const tiers = [];
-  const ensure = ri => {
-    if (!tiers[ri]) tiers[ri] = {from:0,to:0,colors:Array.from({length:10},()=>({price:0,setup:0}))};
-  };
-  document.querySelectorAll('[data-sp-from]').forEach(el => { const ri=+el.dataset.spFrom; ensure(ri); tiers[ri].from=+el.value||0; });
-  document.querySelectorAll('[data-sp-to]').forEach(el   => { const ri=+el.dataset.spTo;   ensure(ri); tiers[ri].to=+el.value||0; });
-  document.querySelectorAll('[data-sp]').forEach(el => {
-    const [ri,ci,field] = el.dataset.sp.split('-');
-    const r=+ri, c=+ci; ensure(r);
-    if (!tiers[r].colors[c]) tiers[r].colors[c] = {price:0,setup:0};
-    tiers[r].colors[c][field] = parseFloat(el.value)||0;
+  const ensure = ri => { if (!tiers[ri]) tiers[ri] = {from:0,to:0,setup:30,colors:Array(10).fill(0)}; };
+  document.querySelectorAll('[data-sp-from]').forEach(el  => { const ri=+el.dataset.spFrom;  ensure(ri); tiers[ri].from=+el.value||0; });
+  document.querySelectorAll('[data-sp-to]').forEach(el    => { const ri=+el.dataset.spTo;    ensure(ri); tiers[ri].to=+el.value||0; });
+  document.querySelectorAll('[data-sp-setup]').forEach(el => { const ri=+el.dataset.spSetup; ensure(ri); tiers[ri].setup=parseFloat(el.value)||0; });
+  document.querySelectorAll('[data-sp-price]').forEach(el => {
+    const [ri,ci] = el.dataset.spPrice.split('-').map(Number);
+    ensure(ri); tiers[ri].colors[ci] = parseFloat(el.value)||0;
   });
   userPricing.spTiers = tiers.filter(Boolean);
 }
@@ -770,8 +773,9 @@ function embPrice(qty) {
 }
 function spPrice(qty, ci) {
   const t = userPricing.spTiers.find(r => qty >= r.from && qty <= r.to);
-  if (!t || !t.colors[ci]) return null;
-  return t.colors[ci].price + t.colors[ci].setup / qty;
+  if (!t || t.colors[ci] === undefined) return null;
+  const numColors = ci + 1;
+  return t.colors[ci] + (t.setup * numColors) / qty;
 }
 
 // ═══════════════════════════════════════
