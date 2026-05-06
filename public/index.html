@@ -165,7 +165,7 @@
     }
   </style>
 </head>
-<body style="visibility:hidden">
+<body style="visibility:hidden"><script>setTimeout(()=>document.body.style.visibility='visible',2500)</script>
 
 <!-- ═══════════════════════
      AUTH SCREEN
@@ -370,7 +370,7 @@ const DEFAULT_SP = [
   {from:250, to:600, setup:34, colors:[1.20,1.25,1.45,1.50,1.65,2.50,2.65,2.80,2.95,3.10]},
 ];
 
-const DEFAULT_MARGIN = [
+const DEFAULT_MARGIN_TIERS = [
   {from:1,   to:35,   margin:1.00},
   {from:36,  to:60,   margin:0.85},
   {from:61,  to:144,  margin:0.65},
@@ -394,7 +394,7 @@ let userPricing = {
   htTiers:      deepClone(DEFAULT_HT),
   embTiers:     deepClone(DEFAULT_EMB),
   spTiers:      deepClone(DEFAULT_SP),
-  marginTiers:  deepClone(DEFAULT_MARGIN),
+  marginTiers:  { unified:true, all:deepClone(DEFAULT_MARGIN_TIERS), ht:deepClone(DEFAULT_MARGIN_TIERS), emb:deepClone(DEFAULT_MARGIN_TIERS), sp:deepClone(DEFAULT_MARGIN_TIERS) },
   quoteTemplate: {...DEFAULT_QT}
 };
 
@@ -446,23 +446,29 @@ async function signOut() {
 }
 
 sb.auth.onAuthStateChange(async (event, session) => {
-  if (session?.user) {
-    currentUser = session.user;
-    document.getElementById('hdr-user-email').textContent = currentUser.email;
-    document.getElementById('auth-screen').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    await loadUserSettings();
-    buildLocGrid();
-  } else {
-    currentUser = null;
-    document.getElementById('app').classList.add('hidden');
+  try {
+    if (session?.user) {
+      currentUser = session.user;
+      document.getElementById('hdr-user-email').textContent = currentUser.email;
+      document.getElementById('auth-screen').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      await loadUserSettings();
+      buildLocGrid();
+    } else {
+      currentUser = null;
+      document.getElementById('app').classList.add('hidden');
+      document.getElementById('auth-screen').classList.remove('hidden');
+      userPricing = {
+        htTiers: deepClone(DEFAULT_HT), embTiers: deepClone(DEFAULT_EMB),
+        spTiers: deepClone(DEFAULT_SP),
+        marginTiers: { unified:true, all:deepClone(DEFAULT_MARGIN_TIERS), ht:deepClone(DEFAULT_MARGIN_TIERS), emb:deepClone(DEFAULT_MARGIN_TIERS), sp:deepClone(DEFAULT_MARGIN_TIERS) },
+        quoteTemplate: {...DEFAULT_QT}
+      };
+      resetAll();
+    }
+  } catch(e) {
+    console.error('onAuthStateChange error:', e);
     document.getElementById('auth-screen').classList.remove('hidden');
-    userPricing = {
-      htTiers: deepClone(DEFAULT_HT), embTiers: deepClone(DEFAULT_EMB),
-      spTiers: deepClone(DEFAULT_SP), marginTiers: deepClone(DEFAULT_MARGIN),
-      quoteTemplate: {...DEFAULT_QT}
-    };
-    resetAll();
   }
   document.body.style.visibility = 'visible';
 });
@@ -470,6 +476,21 @@ sb.auth.onAuthStateChange(async (event, session) => {
 // ═══════════════════════════════════════
 //  SUPABASE DATA
 // ═══════════════════════════════════════
+// Migrate old flat margin array → new per-type object
+function migrateMarginSettings(data) {
+  if (!data) return { unified:true, all:deepClone(DEFAULT_MARGIN_TIERS), ht:deepClone(DEFAULT_MARGIN_TIERS), emb:deepClone(DEFAULT_MARGIN_TIERS), sp:deepClone(DEFAULT_MARGIN_TIERS) };
+  if (Array.isArray(data)) {
+    return { unified:true, all:data, ht:deepClone(data), emb:deepClone(data), sp:deepClone(data) };
+  }
+  return {
+    unified: data.unified !== false,
+    all: data.all || deepClone(DEFAULT_MARGIN_TIERS),
+    ht:  data.ht  || deepClone(DEFAULT_MARGIN_TIERS),
+    emb: data.emb || deepClone(DEFAULT_MARGIN_TIERS),
+    sp:  data.sp  || deepClone(DEFAULT_MARGIN_TIERS),
+  };
+}
+
 // Migrate old SP format {colors:[{price,setup}]} → new format {setup, colors:[prices]}
 function migrateSpPricing(spData) {
   if (!Array.isArray(spData)) return deepClone(DEFAULT_SP);
@@ -491,7 +512,7 @@ async function loadUserSettings() {
   if (data.ht_pricing)      userPricing.htTiers      = data.ht_pricing;
   if (data.emb_pricing)     userPricing.embTiers      = data.emb_pricing;
   if (data.sp_pricing)      userPricing.spTiers       = migrateSpPricing(data.sp_pricing);
-  if (data.margin_settings) userPricing.marginTiers   = data.margin_settings;
+  if (data.margin_settings) userPricing.marginTiers   = migrateMarginSettings(data.margin_settings);
   if (data.quote_template) {
     try {
       userPricing.quoteTemplate = typeof data.quote_template === 'string'
@@ -684,40 +705,88 @@ function collectSpTiers() {
 }
 
 // ─── MARGIN ────────────────────────────────────
-function renderMarginTab() {
-  const tiers = userPricing.marginTiers;
-  const rows = tiers.map((t, ri) => `<tr>
-    <td><input type="number" step="1" min="0" value="${t.from}"                   data-mg-from="${ri}" class="w52"></td>
-    <td><input type="number" step="1" min="0" value="${t.to === 9999 ? 9999 : t.to}" data-mg-to="${ri}"   class="w52"></td>
-    <td><input type="number" step="1" min="0" max="999" value="${Math.round(t.margin*100)}" data-mg-pct="${ri}" class="w52"></td>
-    <td><button class="del-btn" onclick="delMarginRow(${ri})">✕</button></td>
+function mgTierRows(type, tiers) {
+  return (tiers || []).map((t, ri) => `<tr>
+    <td><input type="number" step="1" min="0" value="${t.from}" data-mg="${type}-${ri}-from" class="w52"></td>
+    <td><input type="number" step="1" min="0" value="${t.to}"   data-mg="${type}-${ri}-to"   class="w52"></td>
+    <td><input type="number" step="1" min="0" max="999" value="${Math.round(t.margin*100)}" data-mg="${type}-${ri}-pct" class="w52"></td>
+    <td><button class="del-btn" onclick="delMarginRow('${type}',${ri})">✕</button></td>
   </tr>`).join('');
-  document.getElementById('stab-margin').innerHTML = `
-    <p class="section-note">Your markup percentage per quantity break — applies to all decoration types. Selling price = (Apparel + Decoration) × (1 + Margin%). Use 9999 as the "To" value for your highest tier.</p>
-    <div class="stbl-wrap">
-      <table class="stbl" style="max-width:420px;">
+}
+
+function mgTable(type, tiers, label) {
+  return `
+    ${label ? `<div style="font-size:.85rem;font-weight:800;color:#374151;margin:20px 0 8px;padding-top:12px;border-top:1px solid #e2e8f0;">${label}</div>` : ''}
+    <div class="stbl-wrap" style="max-width:420px;">
+      <table class="stbl">
         <thead><tr><th>Qty From</th><th>Qty To</th><th>Margin %</th><th></th></tr></thead>
-        <tbody>${rows}</tbody>
+        <tbody id="mg-tbody-${type}">${mgTierRows(type, tiers)}</tbody>
       </table>
     </div>
-    <button class="add-row-btn" style="max-width:420px;" onclick="addMarginRow()">+ Add Quantity Break</button>`;
+    <button class="add-row-btn" style="max-width:420px;" onclick="addMarginRow('${type}')">+ Add Qty Break</button>`;
 }
 
-function addMarginRow() {
-  collectMarginTiers();
-  const last = userPricing.marginTiers.at(-1);
-  userPricing.marginTiers.push({ from: last ? last.to+1 : 1, to: 9999, margin: 0.40 });
-  renderMarginTab();
+function renderMarginTab() {
+  const mt = userPricing.marginTiers;
+  const unified = Array.isArray(mt) ? true : mt.unified;
+  document.getElementById('stab-margin').innerHTML = `
+    <p class="section-note">Selling price = (Apparel + Decoration) × (1 + Margin%). Use 9999 as the top "To" value.</p>
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:20px;font-size:.9rem;font-weight:700;color:#374151;">
+      <input type="checkbox" id="mg-unified-chk" ${unified ? 'checked' : ''} onchange="toggleMarginUnified()" style="width:16px;height:16px;cursor:pointer;">
+      Same margin for all decoration types
+    </label>
+    <div id="mg-unified-section"  ${unified ? '' : 'class="hidden"'}>${mgTable('all', Array.isArray(mt) ? mt : mt.all, '')}</div>
+    <div id="mg-split-section"    ${unified ? 'class="hidden"' : ''}>
+      ${mgTable('ht',  mt.ht,  '🔥 Heat Transfer')}
+      ${mgTable('emb', mt.emb, '🧵 Embroidery')}
+      ${mgTable('sp',  mt.sp,  '🖨️ Screen Print')}
+    </div>`;
 }
-function delMarginRow(ri) { collectMarginTiers(); userPricing.marginTiers.splice(ri,1); renderMarginTab(); }
+
+function toggleMarginUnified() {
+  collectMarginTiers();
+  const chk = document.getElementById('mg-unified-chk');
+  userPricing.marginTiers.unified = chk.checked;
+  document.getElementById('mg-unified-section').classList.toggle('hidden', !chk.checked);
+  document.getElementById('mg-split-section').classList.toggle('hidden', chk.checked);
+}
+
+function addMarginRow(type) {
+  collectMarginTiers();
+  const mt = userPricing.marginTiers;
+  const table = mt[type] || [];
+  const last = table.at(-1);
+  table.push({ from: last ? last.to+1 : 1, to: 9999, margin: 0.40 });
+  mt[type] = table;
+  // Re-render just the affected tbody
+  document.getElementById(`mg-tbody-${type}`).innerHTML = mgTierRows(type, table);
+}
+
+function delMarginRow(type, ri) {
+  collectMarginTiers();
+  const mt = userPricing.marginTiers;
+  mt[type].splice(ri, 1);
+  document.getElementById(`mg-tbody-${type}`).innerHTML = mgTierRows(type, mt[type]);
+}
 
 function collectMarginTiers() {
-  const tiers = [];
-  const ensure = ri => { if (!tiers[ri]) tiers[ri] = {from:0,to:0,margin:0}; };
-  document.querySelectorAll('[data-mg-from]').forEach(el  => { const ri=+el.dataset.mgFrom;  ensure(ri); tiers[ri].from=+el.value||0; });
-  document.querySelectorAll('[data-mg-to]').forEach(el    => { const ri=+el.dataset.mgTo;    ensure(ri); tiers[ri].to=+el.value||0; });
-  document.querySelectorAll('[data-mg-pct]').forEach(el   => { const ri=+el.dataset.mgPct;   ensure(ri); tiers[ri].margin=(parseFloat(el.value)||0)/100; });
-  userPricing.marginTiers = tiers.filter(Boolean);
+  const mt = userPricing.marginTiers;
+  if (Array.isArray(mt)) { userPricing.marginTiers = migrateMarginSettings(mt); return; }
+  const chk = document.getElementById('mg-unified-chk');
+  if (chk) mt.unified = chk.checked;
+  ['all','ht','emb','sp'].forEach(type => {
+    const tiers = [];
+    const ensure = ri => { if (!tiers[ri]) tiers[ri] = {from:0,to:0,margin:0}; };
+    document.querySelectorAll(`[data-mg^="${type}-"]`).forEach(el => {
+      const parts = el.dataset.mg.split('-'); // type-ri-field
+      const ri = +parts[1], field = parts[2];
+      ensure(ri);
+      if (field === 'from') tiers[ri].from = +el.value||0;
+      else if (field === 'to') tiers[ri].to = +el.value||0;
+      else if (field === 'pct') tiers[ri].margin = (parseFloat(el.value)||0)/100;
+    });
+    if (tiers.filter(Boolean).length) mt[type] = tiers.filter(Boolean);
+  });
 }
 
 // ─── QUOTE TEMPLATE ────────────────────────────
@@ -755,11 +824,14 @@ function collectSettings() {
 // ═══════════════════════════════════════
 //  PRICING LOOKUPS (use live userPricing)
 // ═══════════════════════════════════════
-function getMargin(qty) {
-  const t = userPricing.marginTiers.find(r => qty >= r.from && qty <= r.to);
+function getMargin(qty, type) {
+  const mt = userPricing.marginTiers;
+  if (Array.isArray(mt)) { const t = mt.find(r => qty >= r.from && qty <= r.to); return t ? t.margin : 0.40; }
+  const table = (mt.unified || !type) ? mt.all : (mt[type] || mt.all);
+  const t = (table || []).find(r => qty >= r.from && qty <= r.to);
   return t ? t.margin : 0.40;
 }
-function marginLabel(qty) { return (getMargin(qty)*100).toFixed(0) + '%'; }
+function marginLabel(qty, type) { return (getMargin(qty, type)*100).toFixed(0) + '%'; }
 function htPrice(qty, si) {
   const t = userPricing.htTiers.find(r => qty >= r.from && qty <= r.to);
   return (t && t.prices[si] != null) ? t.prices[si] : null;
@@ -833,8 +905,15 @@ function setLocType(key, type) {
 // ═══════════════════════════════════════
 function onQtyChange() {
   const qty = parseInt(document.getElementById('qty').value);
-  document.getElementById('margin-hint').textContent =
-    (!isNaN(qty) && qty > 0) ? `Margin rate: ${marginLabel(qty)}` : '';
+  if (!isNaN(qty) && qty > 0) {
+    const mt = userPricing.marginTiers;
+    const unified = Array.isArray(mt) || mt.unified;
+    document.getElementById('margin-hint').textContent = unified
+      ? `Margin: ${marginLabel(qty)}`
+      : `Margin — HT: ${marginLabel(qty,'ht')} · EMB: ${marginLabel(qty,'emb')} · SP: ${marginLabel(qty,'sp')}`;
+  } else {
+    document.getElementById('margin-hint').textContent = '';
+  }
   clearResults();
 }
 
@@ -864,17 +943,20 @@ function calculate() {
     if (type === 'none') continue;
     let price = null, label = '';
 
+    let mgType = 'all';
     if (type === 'heat') {
       const val = document.getElementById(`${key}-ht-size`).value;
       if (!val) { showAlert(`Select a transfer size for ${LOC_LABELS[key]}.`); return; }
       price = htPrice(qty, parseInt(val));
       if (price === null) { showAlert(`No Heat Transfer pricing for qty ${qty}. Add a tier in Settings → Heat Transfer.`); return; }
       label = `Heat Transfer — ${HT_SIZE_LABELS[parseInt(val)]}`;
+      mgType = 'ht';
 
     } else if (type === 'embroidery') {
       price = embPrice(qty);
       if (price === null) { showAlert(`No Embroidery pricing for qty ${qty}. Add a tier in Settings → Embroidery.`); return; }
       label = 'Embroidery (6,000 stitches)';
+      mgType = 'emb';
 
     } else if (type === 'screen') {
       const val = document.getElementById(`${key}-sp-colors`).value;
@@ -883,14 +965,28 @@ function calculate() {
       price = spPrice(qty, ci);
       if (price === null) { showAlert(`No Screen Print pricing for qty ${qty}. Add a tier in Settings → Screen Print.`); return; }
       label = `Screen Print — ${ci+1} color${ci>0?'s':''}`;
+      mgType = 'sp';
     }
-    active.push({ key, locLabel: LOC_LABELS[key], price, label });
+    active.push({ key, locLabel: LOC_LABELS[key], price, label, mgType });
   }
 
   if (!active.length) { showAlert('Select at least one decoration location.'); return; }
 
   const totalDecor  = active.reduce((s,a) => s + a.price, 0);
-  const margin      = getMargin(qty);
+  // Per-type margin: if not unified, use the highest margin across active decoration types
+  const mt = userPricing.marginTiers;
+  const unified = Array.isArray(mt) || mt.unified;
+  let margin, marginDisplay;
+  if (unified) {
+    margin = getMargin(qty);
+    marginDisplay = marginLabel(qty);
+  } else {
+    const types = [...new Set(active.map(a => a.mgType))];
+    margin = Math.max(...types.map(t => getMargin(qty, t)));
+    marginDisplay = types.length === 1
+      ? marginLabel(qty, types[0])
+      : types.map(t => `${t.toUpperCase()} ${marginLabel(qty,t)}`).join(' / ');
+  }
   const subTotal    = totalDecor + apparelCost;
   const totalUnit   = subTotal * (1 + margin);
   const grossMargin = (totalUnit - subTotal) * qty;
@@ -902,7 +998,7 @@ function calculate() {
   document.getElementById('r-apparel').textContent     = fmt(apparelCost);
   document.getElementById('r-print-total').textContent = fmt(totalDecor);
   document.getElementById('r-subtotal').textContent    = fmt(subTotal);
-  document.getElementById('r-margin-rate').textContent = marginLabel(qty);
+  document.getElementById('r-margin-rate').textContent = marginDisplay;
   document.getElementById('r-margin').textContent      = fmtK(grossMargin);
 
   document.getElementById('loc-breakdown').innerHTML = active.map(a =>
