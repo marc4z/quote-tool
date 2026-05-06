@@ -170,7 +170,7 @@
 <!-- ═══════════════════════
      AUTH SCREEN
 ═══════════════════════ -->
-<div id="auth-screen">
+<div id="auth-screen" class="hidden">
   <div class="auth-box">
     <div class="auth-logo">
       <div class="wordmark">4Z<span>Design</span></div>
@@ -440,6 +440,13 @@ function showAuthErr(msg) {
 
 async function signOut() {
   try { await sb.auth.signOut(); } catch(e) { console.warn('signOut:', e); }
+  // Manually clear Supabase's localStorage cache — signOut alone doesn't
+  // always flush before the reload restores the session
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('sb-'))
+      .forEach(k => localStorage.removeItem(k));
+  } catch(e) {}
   window.location.reload();
 }
 
@@ -453,8 +460,8 @@ sb.auth.onAuthStateChange(async (event, session) => {
     buildLocGrid();
   } else {
     currentUser = null;
-    document.getElementById('auth-screen').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
+    document.getElementById('auth-screen').classList.remove('hidden');
     userPricing = {
       htTiers: deepClone(DEFAULT_HT), embTiers: deepClone(DEFAULT_EMB),
       spTiers: deepClone(DEFAULT_SP), marginTiers: deepClone(DEFAULT_MARGIN),
