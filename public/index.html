@@ -180,15 +180,17 @@
       <button class="auth-tab active" id="tab-login"  onclick="switchAuthTab('login')">Sign In</button>
       <button class="auth-tab"        id="tab-signup" onclick="switchAuthTab('signup')">Create Account</button>
     </div>
+    <form id="auth-form" onsubmit="authSubmit();return false;" autocomplete="on">
     <div class="auth-field">
       <label>Email address</label>
-      <input type="text" id="auth-email" placeholder="you@company.com" onkeydown="if(event.key==='Enter')authSubmit()">
+      <input type="email" id="auth-email" name="email" autocomplete="email" placeholder="you@company.com">
     </div>
     <div class="auth-field">
       <label>Password</label>
-      <input type="password" id="auth-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')authSubmit()">
+      <input type="password" id="auth-pass" name="password" autocomplete="current-password" placeholder="••••••••">
     </div>
-    <button class="auth-submit" id="auth-btn" onclick="authSubmit()">Sign In</button>
+    <button type="submit" class="auth-submit" id="auth-btn">Sign In</button>
+    </form>
     <div class="auth-error" id="auth-error"></div>
   </div>
 </div>
