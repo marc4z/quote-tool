@@ -165,7 +165,7 @@
     }
   </style>
 </head>
-<body>
+<body style="visibility:hidden">
 
 <!-- ═══════════════════════
      AUTH SCREEN
@@ -440,13 +440,8 @@ function showAuthErr(msg) {
 
 async function signOut() {
   try { await sb.auth.signOut(); } catch(e) { console.warn('signOut:', e); }
-  // Manually clear Supabase's localStorage cache — signOut alone doesn't
-  // always flush before the reload restores the session
-  try {
-    Object.keys(localStorage)
-      .filter(k => k.startsWith('sb-'))
-      .forEach(k => localStorage.removeItem(k));
-  } catch(e) {}
+  try { localStorage.clear(); } catch(e) {}
+  try { sessionStorage.clear(); } catch(e) {}
   window.location.reload();
 }
 
@@ -469,6 +464,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
     };
     resetAll();
   }
+  document.body.style.visibility = 'visible';
 });
 
 // ═══════════════════════════════════════
